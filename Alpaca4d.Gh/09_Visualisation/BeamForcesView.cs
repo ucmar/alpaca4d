@@ -2,6 +2,7 @@ using Grasshopper;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Special;
 using Rhino.Geometry;
+using Rhino.Display;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,6 +16,17 @@ namespace Alpaca4d.Gh
         private Alpaca4d.Model _model = null;
         private List<Mesh> _forceDiagramMeshes = new List<Mesh>();
         private List<int> _forceTypes = new List<int>();
+        private bool _showText = false;
+        
+        // Data structure to store label information for drawing in the viewport
+        private class ForceLabel
+        {
+            public Point3d Position;
+            public string Text;
+            public System.Drawing.Color Color;
+        }
+
+        private readonly List<ForceLabel> _forceLabels = new List<ForceLabel>();
         private int _step = 0;
         private double _scale = 1.0;
         
@@ -50,6 +62,8 @@ namespace Alpaca4d.Gh
             pManager[pManager.ParamCount - 1].Optional = true;
             pManager.AddColourParameter("NegativeColor", "NegativeColor", "Color for negative force values", GH_ParamAccess.item, System.Drawing.Color.FromArgb(255, 0, 0, 139));
             pManager[pManager.ParamCount - 1].Optional = true;
+            pManager.AddBooleanParameter("ShowText", "ShowText", "Show numeric force values near diagram points", GH_ParamAccess.item, false);
+            pManager[pManager.ParamCount - 1].Optional = true;
         }
 
         /// <summary>
@@ -67,8 +81,9 @@ namespace Alpaca4d.Gh
         {
             base.BeforeSolveInstance();
             
-            // Clear cached meshes
+            // Clear cached meshes and labels
             _forceDiagramMeshes.Clear();
+            _forceLabels.Clear();
             
             // Update value list for ForceType input
             var forceTypeNames = new List<string> 
@@ -87,6 +102,7 @@ namespace Alpaca4d.Gh
         {
             _model = null;
             _forceTypes.Clear();
+            _forceLabels.Clear();
             _step = 0;
             _scale = 1.0;
 
@@ -100,6 +116,7 @@ namespace Alpaca4d.Gh
             DA.GetData(3, ref _scale);
             DA.GetData(4, ref _positiveColorInput);
             DA.GetData(5, ref _negativeColorInput);
+            DA.GetData(6, ref _showText);
             
             // Update public properties
             PositiveColor = _positiveColorInput;
@@ -207,6 +224,20 @@ namespace Alpaca4d.Gh
                 // Determine color based on force value (positive or negative)
                 System.Drawing.Color color = forces[i] >= 0 ? PositiveColor : NegativeColor;
                 colors.Add(color);
+            }
+
+            // Optionally create labels at diagram points
+            if (_showText)
+            {
+                for (int i = 0; i < integrationPoints; i++)
+                {
+                    _forceLabels.Add(new ForceLabel
+                    {
+                        Position = diagramPoints[i],
+                        Text = forces[i].ToString("0.00"),
+                        Color = colors[i]
+                    });
+                }
             }
 
             // Create closed mesh from points with colors
@@ -356,6 +387,30 @@ namespace Alpaca4d.Gh
             {
                 args.Display.DrawMeshFalseColors(mesh);
                 args.Display.DrawMeshWires(mesh, System.Drawing.Color.Black, 1);
+            }
+
+            // Draw numeric labels as dots near diagram points if requested
+            if (_showText && _forceLabels.Count > 0)
+            {
+                foreach (var label in _forceLabels)
+                {
+                    // Plane whose X/Y match the current camera, so text is screen‑aligned
+                    var plane = new Plane(
+                        label.Position,
+                        args.Viewport.CameraX,
+                        args.Viewport.CameraY
+                    );
+
+                    args.Display.Draw3dText(
+                        label.Text,
+                        System.Drawing.Color.Black,
+                        plane,
+                        0.5,          // text height in model units; tweak to taste
+                        "Arial",
+                        false,
+                        false
+                    );
+                }
             }
         }
 
