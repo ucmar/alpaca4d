@@ -14,13 +14,13 @@ namespace Alpaca4d.Gh
     {
         private Alpaca4d.Model _model = null;
         private List<Mesh> _forceDiagramMeshes = new List<Mesh>();
-        private int _forceType = 0;
+        private List<int> _forceTypes = new List<int>();
         private int _step = 0;
         private double _scale = 1.0;
         
         // Color properties for positive and negative values
-        public System.Drawing.Color PositiveColor { get; set; } = System.Drawing.Color.FromArgb(255, 139, 0, 0); // Dark red (wine)
-        public System.Drawing.Color NegativeColor { get; set; } = System.Drawing.Color.FromArgb(255, 0, 0, 139); // Dark blue
+        public System.Drawing.Color PositiveColor { get; set; } = System.Drawing.Color.FromArgb(125, 139, 0, 0); // Dark red (wine)
+        public System.Drawing.Color NegativeColor { get; set; } = System.Drawing.Color.FromArgb(125, 0, 0, 139); // Dark blue
         
         private System.Drawing.Color _positiveColorInput = System.Drawing.Color.FromArgb(255, 139, 0, 0);
         private System.Drawing.Color _negativeColorInput = System.Drawing.Color.FromArgb(255, 0, 0, 139);
@@ -40,7 +40,7 @@ namespace Alpaca4d.Gh
         protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
         {
             pManager.AddGenericParameter("AlpacaModel", "AlpacaModel", "The Alpaca Model", GH_ParamAccess.item);
-            pManager.AddIntegerParameter("ForceType", "ForceType", "Force type to display: 0=N, 1=Vy, 2=Vz, 3=Torsion, 4=My, 5=Mz", GH_ParamAccess.item, 0);
+            pManager.AddIntegerParameter("ForceType", "ForceType", "Force type to display: 0=N, 1=Vy, 2=Vz, 3=Torsion, 4=My, 5=Mz", GH_ParamAccess.list);
             pManager[pManager.ParamCount - 1].Optional = true;
             pManager.AddIntegerParameter("Step", "Step", "Analysis step", GH_ParamAccess.item, 0);
             pManager[pManager.ParamCount - 1].Optional = true;
@@ -86,12 +86,16 @@ namespace Alpaca4d.Gh
         protected override void SolveInstance(IGH_DataAccess DA)
         {
             _model = null;
-            _forceType = 0;
+            _forceTypes.Clear();
             _step = 0;
             _scale = 1.0;
 
             if (!DA.GetData(0, ref _model)) return;
-            DA.GetData(1, ref _forceType);
+            if (!DA.GetDataList(1, _forceTypes))
+            {
+                // If no list provided, default to single force type 0
+                _forceTypes.Add(0);
+            }
             DA.GetData(2, ref _step);
             DA.GetData(3, ref _scale);
             DA.GetData(4, ref _positiveColorInput);
@@ -101,40 +105,49 @@ namespace Alpaca4d.Gh
             PositiveColor = _positiveColorInput;
             NegativeColor = _negativeColorInput;
 
-            // Validate force type
-            if (_forceType < 0 || _forceType > 5)
+            // Validate force types
+            foreach (var forceType in _forceTypes)
             {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "ForceType must be between 0 and 5");
-                return;
+                if (forceType < 0 || forceType > 5)
+                {
+                    AddRuntimeMessage(GH_RuntimeMessageLevel.Error, $"ForceType must be between 0 and 5, got {forceType}");
+                    return;
+                }
             }
 
             // Read force data
             (var n, var mz, var vy, var my, var vz, var t) = Alpaca4d.Result.Read.ForceBeamColumn(_model, _step);
 
-            // Select the appropriate force component based on _forceType
-            var forceData = GetForceComponent(_forceType, n, vy, vz, t, my, mz);
-
-            // Create force diagrams for each beam
+            // Create force diagrams for each force type
             _forceDiagramMeshes.Clear();
-            for (int i = 0; i < _model.Beams.Count; i++)
+            string[] forceNames = { "N", "Vy", "Vz", "Torsion", "My", "Mz" };
+            
+            foreach (var forceType in _forceTypes)
             {
-                if (i < forceData.Count)
+                // Select the appropriate force component based on forceType
+                var forceData = GetForceComponent(forceType, n, vy, vz, t, my, mz);
+
+                // Create force diagrams for each beam
+                for (int i = 0; i < _model.Beams.Count; i++)
                 {
-                    var beam = _model.Beams[i];
-                    var forces = forceData[i];
-                    
-                    // Create diagram mesh for this beam
-                    var diagramMesh = CreateBeamForceDiagram((Alpaca4d.Element.ForceBeamColumn)beam, forces, _forceType, _scale);
-                    if (diagramMesh != null)
+                    if (i < forceData.Count)
                     {
-                        _forceDiagramMeshes.Add(diagramMesh);
+                        var beam = _model.Beams[i];
+                        var forces = forceData[i];
+                        
+                        // Create diagram mesh for this beam
+                        var diagramMesh = CreateBeamForceDiagram((Alpaca4d.Element.ForceBeamColumn)beam, forces, forceType, _scale);
+                        if (diagramMesh != null)
+                        {
+                            _forceDiagramMeshes.Add(diagramMesh);
+                        }
                     }
                 }
             }
 
             // Output info
-            string[] forceNames = { "N", "Vy", "Vz", "Torsion", "My", "Mz" };
-            string info = $"Force: {forceNames[_forceType]}, Beams: {_model.Beams.Count}, Step: {_step}, Scale: {_scale:F2}";
+            var forceTypeNames = _forceTypes.Select(ft => forceNames[ft]).ToList();
+            string info = $"Forces: {string.Join(", ", forceTypeNames)}, Beams: {_model.Beams.Count}, Step: {_step}, Scale: {_scale:F2}";
             DA.SetData(0, info);
 
             // Ensure viewport updates
@@ -244,11 +257,7 @@ namespace Alpaca4d.Gh
                 mesh.VertexColors.Add(boundaryColors[i]);
             }
             
-            // Create faces using ear clipping triangulation approach
-            // For a convex polygon (which a force diagram typically is), simple fan works
-            // For better results, create triangles from opposite edges
-            
-            // Method: Create triangle strip connecting beam edge to diagram edge
+            // Create quad faces connecting beam edge to diagram edge
             for (int i = 0; i < n - 1; i++)
             {
                 // Vertices on beam edge: i, i+1
@@ -258,9 +267,8 @@ namespace Alpaca4d.Gh
                 int d0 = 2 * n - 1 - i;
                 int d1 = 2 * n - 2 - i;
                 
-                // Create two triangles for each quad
-                mesh.Faces.AddFace(b0, b1, d1);
-                mesh.Faces.AddFace(b0, d1, d0);
+                // Create quad face connecting beam edge to diagram edge
+                mesh.Faces.AddFace(b0, b1, d1, d0);
             }
 
             mesh.Normals.ComputeNormals();
@@ -317,12 +325,12 @@ namespace Alpaca4d.Gh
                     return tDirection;
 
                 case 4: // Moment Y (My)
-                    // Plot along local Y
-                    return localY;
+                    // Plot perpendicular to local Y (along local Z)
+                    return localZ;
 
                 case 5: // Moment Z (Mz)
-                    // Plot along local Z
-                    return localZ;
+                    // Plot perpendicular to local Z (along local Y)
+                    return localY;
 
                 default:
                     return Vector3d.ZAxis;
