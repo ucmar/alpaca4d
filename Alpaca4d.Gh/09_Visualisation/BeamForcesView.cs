@@ -1,13 +1,16 @@
 using Grasshopper;
 using Grasshopper.Kernel;
 using Grasshopper.Kernel.Special;
+using GH_IO.Serialization;
 using Rhino.Geometry;
 using Rhino.Display;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows.Forms;
 using Alpaca4d.Result;
 using Alpaca4d.UIWidgets;
+using Alpaca4d.UI;
 
 namespace Alpaca4d.Gh
 {
@@ -30,12 +33,8 @@ namespace Alpaca4d.Gh
         private int _step = 0;
         private double _scale = 1.0;
         
-        // Color properties for positive and negative values
-        public System.Drawing.Color PositiveColor { get; set; } = System.Drawing.Color.FromArgb(125, 139, 0, 0); // Dark red (wine)
-        public System.Drawing.Color NegativeColor { get; set; } = System.Drawing.Color.FromArgb(125, 0, 0, 139); // Dark blue
-        
-        private System.Drawing.Color _positiveColorInput = System.Drawing.Color.FromArgb(255, 139, 0, 0);
-        private System.Drawing.Color _negativeColorInput = System.Drawing.Color.FromArgb(255, 0, 0, 139);
+        // Text height for force labels (can be changed via right-click menu)
+        public double TextHeight { get; set; } = 0.5;
 
         public BeamForcesView()
           : base("Beam Forces View (Alpaca4d)", "Beam Forces View",
@@ -57,10 +56,6 @@ namespace Alpaca4d.Gh
             pManager.AddIntegerParameter("Step", "Step", "Analysis step", GH_ParamAccess.item, 0);
             pManager[pManager.ParamCount - 1].Optional = true;
             pManager.AddNumberParameter("Scale", "Scale", "Diagram scale factor", GH_ParamAccess.item, 1.0);
-            pManager[pManager.ParamCount - 1].Optional = true;
-            pManager.AddColourParameter("PositiveColor", "PositiveColor", "Color for positive force values", GH_ParamAccess.item, System.Drawing.Color.FromArgb(255, 139, 0, 0));
-            pManager[pManager.ParamCount - 1].Optional = true;
-            pManager.AddColourParameter("NegativeColor", "NegativeColor", "Color for negative force values", GH_ParamAccess.item, System.Drawing.Color.FromArgb(255, 0, 0, 139));
             pManager[pManager.ParamCount - 1].Optional = true;
             pManager.AddBooleanParameter("ShowText", "ShowText", "Show numeric force values near diagram points", GH_ParamAccess.item, false);
             pManager[pManager.ParamCount - 1].Optional = true;
@@ -114,13 +109,7 @@ namespace Alpaca4d.Gh
             }
             DA.GetData(2, ref _step);
             DA.GetData(3, ref _scale);
-            DA.GetData(4, ref _positiveColorInput);
-            DA.GetData(5, ref _negativeColorInput);
-            DA.GetData(6, ref _showText);
-            
-            // Update public properties
-            PositiveColor = _positiveColorInput;
-            NegativeColor = _negativeColorInput;
+            DA.GetData(4, ref _showText);
 
             // Validate force types
             foreach (var forceType in _forceTypes)
@@ -191,6 +180,30 @@ namespace Alpaca4d.Gh
         }
 
         /// <summary>
+        /// Gets the positive and negative colors for a specific force type from the Palette
+        /// </summary>
+        private (System.Drawing.Color positive, System.Drawing.Color negative) GetForceTypeColors(int forceType)
+        {
+            switch (forceType)
+            {
+                case 0: // Normal force (N)
+                    return (Palette.N_Positive, Palette.N_Negative);
+                case 1: // Shear Y (Vy)
+                    return (Palette.Vy_Positive, Palette.Vy_Negative);
+                case 2: // Shear Z (Vz)
+                    return (Palette.Vz_Positive, Palette.Vz_Negative);
+                case 3: // Torsion (Mx)
+                    return (Palette.Torsion_Positive, Palette.Torsion_Negative);
+                case 4: // Moment Y (My)
+                    return (Palette.My_Positive, Palette.My_Negative);
+                case 5: // Moment Z (Mz)
+                    return (Palette.Mz_Positive, Palette.Mz_Negative);
+                default:
+                    return (Palette.N_Positive, Palette.N_Negative);
+            }
+        }
+
+        /// <summary>
         /// Creates a force diagram mesh for a single beam
         /// </summary>
         private Mesh CreateBeamForceDiagram(Alpaca4d.Element.ForceBeamColumn beam, List<double> forces, int forceType, double scale)
@@ -208,6 +221,9 @@ namespace Alpaca4d.Gh
             var diagramPoints = new List<Point3d>();
             var colors = new List<System.Drawing.Color>();
 
+            // Get colors for this force type from the Palette
+            var (positiveColor, negativeColor) = GetForceTypeColors(forceType);
+
             for (int i = 0; i < integrationPoints; i++)
             {
                 // Get parameter along curve (assuming uniform distribution)
@@ -221,8 +237,8 @@ namespace Alpaca4d.Gh
                 beamPoints.Add(pointOnBeam);
                 diagramPoints.Add(diagramPoint);
                 
-                // Determine color based on force value (positive or negative)
-                System.Drawing.Color color = forces[i] >= 0 ? PositiveColor : NegativeColor;
+                // Determine color based on force value (positive or negative) using Palette colors
+                System.Drawing.Color color = forces[i] >= 0 ? positiveColor : negativeColor;
                 colors.Add(color);
             }
 
@@ -405,7 +421,7 @@ namespace Alpaca4d.Gh
                         label.Text,
                         System.Drawing.Color.Black,
                         plane,
-                        0.5,          // text height in model units; tweak to taste
+                        TextHeight,   // text height in model units (adjustable via right-click menu)
                         "Arial",
                         false,
                         false
@@ -427,6 +443,82 @@ namespace Alpaca4d.Gh
             }
         }
 
+        #region Serialization (Persistence)
+        
+        /// <summary>
+        /// Writes the text height value to the document for persistence
+        /// </summary>
+        public override bool Write(GH_IWriter writer)
+        {
+            writer.SetDouble("TextHeight", TextHeight);
+            return base.Write(writer);
+        }
+
+        /// <summary>
+        /// Reads the text height value from the document
+        /// </summary>
+        public override bool Read(GH_IReader reader)
+        {
+            try
+            {
+                TextHeight = reader.GetDouble("TextHeight");
+            }
+            catch
+            {
+                TextHeight = 0.5; // Default value if not found
+            }
+            return base.Read(reader);
+        }
+        
+        #endregion
+
+        #region Custom Menu Items
+        
+        /// <summary>
+        /// Appends custom menu items to the component's right-click menu
+        /// </summary>
+        protected override void AppendAdditionalComponentMenuItems(ToolStripDropDown menu)
+        {
+            base.AppendAdditionalComponentMenuItems(menu);
+            
+            // Add separator
+            Menu_AppendSeparator(menu);
+            
+            // ========== SLIDER OPTION ==========
+            // Add label showing current value (will be updated by slider)
+            var sliderLabel = new ToolStripLabel($"Text Height: {TextHeight:0.00}");
+            sliderLabel.Font = new System.Drawing.Font(sliderLabel.Font, System.Drawing.FontStyle.Bold);
+            menu.Items.Add(sliderLabel);
+            
+            // Add TrackBar (slider) using ToolStripControlHost
+            var slider = new TrackBar();
+            slider.Minimum = 1;       // Represents 0.1
+            slider.Maximum = 10;      // Represents 1.0
+            slider.Value = Math.Min(Math.Max((int)(TextHeight * 10), 1), 10); // Clamp to valid range
+            slider.Width = 200;
+            slider.Height = 45;
+            slider.TickFrequency = 1;
+            slider.SmallChange = 1;
+            slider.LargeChange = 2;
+            slider.TickStyle = TickStyle.BottomRight;
+            
+            // Update label and apply value immediately when slider changes
+            slider.ValueChanged += (s, e) =>
+            {
+                double newHeight = slider.Value / 10.0;
+                sliderLabel.Text = $"Text Height: {newHeight:0.00}";
+                
+                // Apply the value immediately
+                if (Math.Abs(TextHeight - newHeight) > 0.001)
+                {
+                    TextHeight = newHeight;
+                    ExpireSolution(true);
+                }
+            };
+        }
+        
+        #endregion
+
         /// <summary>
         /// The Exposure property controls where in the panel a component icon 
         /// will appear. There are seven possible locations (primary to septenary), 
@@ -439,7 +531,7 @@ namespace Alpaca4d.Gh
         /// Provides an Icon for every component that will be visible in the User Interface.
         /// Icons need to be 24x24 pixels.
         /// </summary>
-        protected override System.Drawing.Bitmap Icon => Alpaca4d.Gh.Properties.Resources.Beam_Forces__Alpaca4d_;
+        protected override System.Drawing.Bitmap Icon => Alpaca4d.Gh.Properties.Resources.BeamForcesDiagram__Alpaca4d_;
 
         /// <summary>
         /// Each component must have a unique Guid to identify it. 

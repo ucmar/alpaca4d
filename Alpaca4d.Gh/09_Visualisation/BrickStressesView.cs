@@ -278,7 +278,7 @@ namespace Alpaca4d.Gh
         /// Provides an Icon for every component that will be visible in the User Interface.
         /// Icons need to be 24x24 pixels.
         /// </summary>
-        protected override System.Drawing.Bitmap Icon => Alpaca4d.Gh.Properties.Resources.Brick_Stresses__Alpaca4d_;
+        protected override System.Drawing.Bitmap Icon => Alpaca4d.Gh.Properties.Resources.View_Brick_Stresses__Alpaca4d_;
 
         /// <summary>
         /// Each component must have a unique Guid to identify it. 
