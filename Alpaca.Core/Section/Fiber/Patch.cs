@@ -40,10 +40,10 @@ namespace Alpaca4d.Section
 
         public string WriteTcl()
         {
-            string tcl = "";
+            var sb = new StringBuilder();
             foreach (var fiber in this.Fibers)
-                tcl += fiber.WriteTcl();
-            return tcl;
+                sb.Append(fiber.WriteTcl());
+            return sb.ToString();
         }
     }
 }

@@ -47,27 +47,27 @@ namespace Alpaca4d.Section
 
         public string WriteTcl()
         {
-            string tcl = "";
+            var sb = new StringBuilder();
 
-            tcl += $"section Fiber {this.Id} -GJ {this.GJ} {{\n";
+            sb.Append($"section Fiber {this.Id} -GJ {this.GJ} {{\n");
             foreach (var element in PointFibers)
             {
-                tcl += element.WriteTcl();
+                sb.Append(element.WriteTcl());
             }
 
             foreach (var element in Layers)
             {
-                tcl += element.WriteTcl();
+                sb.Append(element.WriteTcl());
             }
 
             foreach (var element in Patches)
             {
-                tcl += element.WriteTcl();
+                sb.Append(element.WriteTcl());
             }
 
-            tcl += "}\n";
+            sb.Append("}\n");
 
-            return tcl;
+            return sb.ToString();
         }
     }
 }
