@@ -74,12 +74,12 @@ namespace Alpaca4d.Loads
 
         public string WriteTcl()
         {
-            var tcl = "";
+            var sb = new StringBuilder();
             foreach(var load in this.PointLoads)
             {
-                tcl += load.WriteTcl();
+                sb.Append(load.WriteTcl());
             }
-            return tcl;
+            return sb.ToString();
         }
     }
 }
