@@ -60,26 +60,25 @@ namespace Alpaca4d.Loads
 
         public string WriteTcl()
         {
-            string tcl = "";
-            tcl += this.TimeSeries.WriteTcl();
+            var sb = new StringBuilder();
+            sb.Append(this.TimeSeries.WriteTcl());
+            
             if (PatternType == PatternType.Plain)
             {
-                tcl += $"pattern {PatternType} {Id} {TimeSeries.Id} -fact {Factor} {{\n";
+                sb.Append($"pattern {PatternType} {Id} {TimeSeries.Id} -fact {Factor} {{\n");
                 foreach (var load in Load)
                 {
-                    tcl += load.WriteTcl();
+                    sb.Append(load.WriteTcl());
                 }
-                tcl += "}\n";
+                sb.Append("}\n");
             }
 
-            // pattern UniformExcitation $patternTag $dir -accel $tsTag <-vel0 $vel0> <-fact $cFactor>
             if (PatternType == PatternType.UniformExcitation)
             {
-                tcl += $"pattern {PatternType} {Id} {(int)Dof} -accel {TimeSeries.Id} -vel0 {Velocity} -fact {Factor}";
+                sb.Append($"pattern {PatternType} {Id} {(int)Dof} -accel {TimeSeries.Id} -vel0 {Velocity} -fact {Factor}");
             }
 
-
-            return tcl;
+            return sb.ToString();
         }
     }
 
