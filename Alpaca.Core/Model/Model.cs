@@ -796,12 +796,6 @@ namespace Alpaca4d
                         else if (item.Type == Alpaca4d.Loads.LoadType.Gravity)
                         {
                             var gravityLoad = this.CreateGravityLoad((Alpaca4d.Loads.Gravity)item);
-                            // set tags on gravity loads
-                            foreach (var load in gravityLoad)
-                            {
-                                load.SetTag(this);
-                            }
-
                             myLoads.AddRange(gravityLoad);
                         }
                     }
