@@ -25,18 +25,25 @@ namespace Alpaca4d
             plane.Rotate(-num + 1.5707963267948966, plane.ZAxis, plane.Origin);
             return plane;
         }
-        public static List<int> RTreeSearch(Rhino.Geometry.RTree RTree, List<Point3d> searchPoint, double tol)
+        public static List<int> RTreeSearch(RTree tree, IList<Point3d> searchPoints, double tol)
         {
-            var closestIndexes = new List<int>();
+            var closestIndexes = new List<int>(searchPoints.Count);
 
-            foreach (var item in searchPoint)
+            foreach (var pt in searchPoints)
             {
-                RTree.Search(new Sphere(item, tol), SearchCallback);
-            }
+                int foundIndex = -1;
 
-            void SearchCallback(object sender, RTreeEventArgs e)
-            {
-                closestIndexes.Add(e.Id);
+                tree.Search(new Sphere(pt, tol), (sender, e) =>
+                {
+                    foundIndex = e.Id;
+                    // Stop further callbacks for this search once we have a hit
+                    e.Cancel = true;
+                });
+
+                if (foundIndex == -1)
+                    throw new Exception("No node found within tolerance.");
+
+                closestIndexes.Add(foundIndex);
             }
 
             return closestIndexes;
