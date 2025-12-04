@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -236,6 +236,11 @@ namespace Alpaca4d
         public List<Mesh> DeformedBeam(int step, double scale, List<System.Drawing.Color> colors, double min, double max)
         {
             var dispDictionary = this.NodalDisplacements(step);
+            return DeformedBeam(dispDictionary, scale, colors, min, max);
+        }
+
+        public List<Mesh> DeformedBeam(Dictionary<int?, Vector3d> dispDictionary, double scale, List<System.Drawing.Color> colors, double min, double max)
+        {
 
             var beamDefModel = new List<Mesh>();
 
@@ -286,6 +291,11 @@ namespace Alpaca4d
         public List<Mesh> DeformedShell(int step, double scale, List<System.Drawing.Color> colors, double min, double max)
         {
             var dispDictionary = this.NodalDisplacements(step);
+            return DeformedShell(dispDictionary, scale, colors, min, max);
+        }
+
+        public List<Mesh> DeformedShell(Dictionary<int?, Vector3d> dispDictionary, double scale, List<System.Drawing.Color> colors, double min, double max)
+        {
 
             // find the total range of displacement
             var disp = dispDictionary.Values.Select(x => x.Length);
@@ -344,6 +354,11 @@ namespace Alpaca4d
         public List<Mesh> DeformedBrick(int step, double scale, List<System.Drawing.Color> colors, double min, double max)
         {
             var dispDictionary = this.NodalDisplacements(step);
+            return DeformedBrick(dispDictionary, scale, colors, min, max);
+        }
+
+        public List<Mesh> DeformedBrick(Dictionary<int?, Vector3d> dispDictionary, double scale, List<System.Drawing.Color> colors, double min, double max)
+        {
 
             // find the total range of displacement
             var disp = dispDictionary.Values.Select(x => x.Length);

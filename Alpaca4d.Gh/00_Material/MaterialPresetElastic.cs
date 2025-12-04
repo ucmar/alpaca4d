@@ -10,6 +10,7 @@ using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System.Reflection;
 using static Alpaca4d.Gh.ComponentMessage;
+using GH_IO.Serialization;
 
 namespace Alpaca4d.Gh
 {
@@ -29,6 +30,11 @@ namespace Alpaca4d.Gh
 		private static JObject concreteDb;
 		private static JObject timberDb;
 		private static JObject plasticDb;
+
+		// Persisted selection state (for GH file save/load)
+		private string storedType = "Steel";
+		private string storedGrade = "S235";
+		private string storedModel = "nD";
 
 		private bool TryLoadCustomDb(string path)
 		{
@@ -172,17 +178,24 @@ namespace Alpaca4d.Gh
 			attr.AddMenu(menu);
 			attr.MinWidth = 160f;
 
+			// Populate dropdown items
 			InitializeModelOptions();
 			InitializeTypeOptions();
-			InitializeGradeOptions();
+
+			// Apply any stored selections (for loaded components) and
+			// also build the grade list for the selected type.
+			RestoreSelectionsFromStoredValues();
 		}
 
 		protected override void OnComponentLoaded()
 		{
 			base.OnComponentLoaded();
+
+			// Rebuild dropdown contents and then reapply the stored selection
+			// that we read in from the GH file.
 			InitializeModelOptions();
 			InitializeTypeOptions();
-			InitializeGradeOptions();
+			RestoreSelectionsFromStoredValues();
 		}
 
 		private void OnModelChanged(object sender, EventArgs e)
@@ -272,6 +285,42 @@ namespace Alpaca4d.Gh
 			}
 		}
 
+		/// <summary>
+		/// Apply the stored selection (type/grade/model) to the dropdowns after they
+		/// have been populated. Safe to call when any of the dropdowns are null.
+		/// </summary>
+		private void RestoreSelectionsFromStoredValues()
+		{
+			// Restore model selection
+			if (modelDrop != null && !string.IsNullOrEmpty(storedModel))
+			{
+				int modelIdx = modelDrop.FindIndex(storedModel);
+				if (modelIdx >= 0)
+					modelDrop.Value = modelIdx;
+			}
+
+			// Restore type selection
+			if (typeDrop != null && !string.IsNullOrEmpty(storedType))
+			{
+				int typeIdx = typeDrop.FindIndex(storedType);
+				if (typeIdx >= 0)
+					typeDrop.Value = typeIdx;
+			}
+
+			// Rebuild and restore grade selection based on the (possibly updated) type
+			if (gradeDrop != null)
+			{
+				InitializeGradeOptions();
+
+				if (!string.IsNullOrEmpty(storedGrade))
+				{
+					int gradeIdx = gradeDrop.FindIndex(storedGrade);
+					if (gradeIdx >= 0)
+						gradeDrop.Value = gradeIdx;
+				}
+			}
+		}
+
 		private static string GetSelected(MenuDropDown dd, string defaultName)
 		{
 			if (dd.Items.Count == 0) return defaultName;
@@ -322,6 +371,11 @@ namespace Alpaca4d.Gh
 			string selType = typeDrop != null ? GetSelected(typeDrop, "Steel") : "Steel";
 			string selGrade = gradeDrop != null ? GetSelected(gradeDrop, "S235") : "S235";
 			string selModel = modelDrop != null ? GetSelected(modelDrop, "nD") : "nD";
+
+			// Keep the persisted selection state in sync with the UI
+			storedType = selType;
+			storedGrade = selGrade;
+			storedModel = selModel;
 
 			// Compute properties in kN/m^2, unit system consistent with existing components (Force=kN, Length=m)
 			double E, nu, rho;
@@ -466,6 +520,35 @@ namespace Alpaca4d.Gh
 			var nuComputed = ComputeNuFromEG(MPaTokN_m2(eMpa), MPaTokN_m2(gMpa));
 			nu = !double.IsNaN(nuComputed) ? nuComputed : 0.40;
 		}
+
+		#region GH persistence
+
+		public override bool Write(GH_IWriter writer)
+		{
+			// Persist the last used selections so the UI can restore them.
+			var chunk = writer.CreateChunk("MaterialPresetElastic");
+			chunk.SetString("Type", storedType ?? "Steel");
+			chunk.SetString("Grade", storedGrade ?? "S235");
+			chunk.SetString("Model", storedModel ?? "nD");
+
+			return base.Write(writer);
+		}
+
+		public override bool Read(GH_IReader reader)
+		{
+			// Load stored selections (if present) before the base logic triggers OnComponentLoaded.
+			if (reader.ChunkExists("MaterialPresetElastic"))
+			{
+				var chunk = reader.FindChunk("MaterialPresetElastic");
+				try { storedType = chunk.GetString("Type"); } catch { storedType = "Steel"; }
+				try { storedGrade = chunk.GetString("Grade"); } catch { storedGrade = "S235"; }
+				try { storedModel = chunk.GetString("Model"); } catch { storedModel = "nD"; }
+			}
+
+			return base.Read(reader);
+		}
+
+		#endregion
 	}
 }
 
