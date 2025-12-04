@@ -100,7 +100,7 @@ namespace Alpaca4d.Gh
             _colors = new List<System.Drawing.Color>();
             if (!DA.GetDataList(3, _colors))
             {
-                _colors = Alpaca4d.Colors.Gradient(11);
+                _colors = Alpaca4d.Colors.Gradient(0);
             }
 
             // Read force data

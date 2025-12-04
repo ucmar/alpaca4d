@@ -501,6 +501,10 @@ namespace Alpaca4d.Gh
             slider.SmallChange = 1;
             slider.LargeChange = 2;
             slider.TickStyle = TickStyle.BottomRight;
+
+            // Host the TrackBar inside the Grasshopper menu so it becomes visible
+            var sliderHost = new ToolStripControlHost(slider);
+            menu.Items.Add(sliderHost);
             
             // Update label and apply value immediately when slider changes
             slider.ValueChanged += (s, e) =>

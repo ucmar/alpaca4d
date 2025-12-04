@@ -95,7 +95,7 @@ namespace Alpaca4d.Gh
             }
 			else
 			{
-                colors = Alpaca4d.Colors.Gradient(11);
+                colors = Alpaca4d.Colors.Gradient(0);
                 mesh = model.DeformedShell(step, scale, colors, min, max);
                 lines = model.DeformedBeam(step, scale, colors, min, max);
                 bricks = model.DeformedBrick(step, scale, colors, min, max);
