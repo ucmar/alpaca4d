@@ -85,7 +85,7 @@ namespace Alpaca4d.Gh
                 geomTransf = new Element.GeomTransf(Alpaca4d.Element.GeomTransfType.Linear, line, zAxis);
             }
 
-            Color color = Color.LightBlue;
+            Color color = System.Drawing.Color.FromArgb(255, 13, 13, 13);
             DA.GetData(4, ref color);
 
 

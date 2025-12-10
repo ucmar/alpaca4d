@@ -112,6 +112,7 @@
     <Compile Include="Application\Application.cs" />
     <Compile Include="Constraint\ConstraintType.cs" />
     <Compile Include="Element\ASDShellQ4.cs" />
+    <Compile Include="Element\ASDShellT3.cs" />
     <Compile Include="Element\BeamIntegration.cs" />
     <Compile Include="Element\ElementEnum.cs" />
     <Compile Include="Element\ForceBeamColumn.cs" />

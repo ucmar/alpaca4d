@@ -40,8 +40,8 @@ namespace Alpaca4d.Gh
         /// </summary>
         protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
         {
-            pManager.Register_GenericParam("Line", "Line", "");
-            pManager.Register_GenericParam("Mesh", "Mesh", "");
+            pManager.Register_GenericParam("Beam", "Beam", "");
+            pManager.Register_GenericParam("Shell", "Shell", "");
             pManager.Register_GenericParam("Brick", "Brick", "");
         }
 

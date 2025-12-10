@@ -1,0 +1,111 @@
+using Grasshopper;
+using Grasshopper.Kernel;
+using Rhino.Geometry;
+using System;
+using System.Drawing;
+using System.Collections.Generic;
+using Alpaca4d.Generic;
+using Alpaca4d;
+
+namespace Alpaca4d.Gh
+{
+    public class ASDShell : GH_Component
+    {
+        public ASDShell()
+          : base("ASD Shell (Alpaca4d)", "ASDQ4/ASDT3",
+            "Construct a ASDShellQ4 element or ASDShellT3 Shell",
+            "Alpaca4d", "02_Element")
+        {
+            // Draw a Description Underneath the component
+            this.Message = Alpaca4d.Gh.ComponentMessage.MyMessage(this);
+        }
+
+        /// <summary>
+        /// Registers all the input parameters for this component.
+        /// </summary>
+        protected override void RegisterInputParams(GH_Component.GH_InputParamManager pManager)
+        {
+            pManager.AddMeshParameter("Mesh", "Mesh", $"[{Units.Length}]", GH_ParamAccess.item);
+            pManager.AddGenericParameter("Section", "Section", "", GH_ParamAccess.item);
+            pManager.AddColourParameter("Colour", "Colour", "", GH_ParamAccess.item);
+            pManager[pManager.ParamCount - 1].Optional = true;
+            pManager.AddVectorParameter("Local X Axis", "LocalX", "", GH_ParamAccess.item);
+            pManager[pManager.ParamCount - 1].Optional = true;
+            pManager.AddBooleanParameter("Is Corotational", "IsCorotational", "", GH_ParamAccess.item, false);
+            pManager[pManager.ParamCount - 1].Optional = true;
+        }
+
+        /// <summary>
+        /// Registers all the output parameters for this component.
+        /// </summary>
+        protected override void RegisterOutputParams(GH_Component.GH_OutputParamManager pManager)
+        {
+            pManager.Register_GenericParam("Element", "Element", "Element");
+        }
+
+        /// <summary>
+        /// This is the method that actually does the work.
+        /// </summary>
+        /// <param name="DA">The DA object can be used to retrieve data from input parameters and 
+        /// to store data in output parameters.</param>
+        protected override void SolveInstance(IGH_DataAccess DA)
+        {
+            Mesh _mesh = null;
+            DA.GetData(0, ref _mesh);
+
+            IMultiDimensionSection section = null;
+            DA.GetData(1, ref section);
+
+            Color color = Color.AliceBlue;
+            if (!DA.GetData(2, ref color))
+            {
+                color = Color.IndianRed;
+            }
+
+            Vector3d localX = default;
+            DA.GetData(3, ref localX);
+
+            bool isCorotational = false;
+            DA.GetData(4, ref isCorotational);
+
+            var meshes = new List<Mesh>();
+
+            if (_mesh.Faces.Count > 0)
+            {
+                meshes = Utils.ExplodeMesh(_mesh);
+            }
+            else
+            {
+                meshes.Add(_mesh);
+            }
+
+			var elements = new List<Alpaca4d.Generic.IShell>();
+			foreach (var mesh in meshes)
+            {
+				if (mesh.Vertices.Count == 4)
+                {
+                    var element = new Alpaca4d.Element.ASDShellQ4(mesh, section, localX, isCorotational);
+                    element.Color = color;
+
+                    elements.Add(element);
+                }
+                else if (mesh.Vertices.Count == 3)
+                {
+                    var element = new Alpaca4d.Element.ASDShellT3(mesh, section, localX, isCorotational);
+                    element.Color = color;
+
+                    elements.Add(element);
+                }
+            }
+			DA.SetDataList(0, elements);
+        }
+
+
+        public override GH_Exposure Exposure => GH_Exposure.secondary;
+
+        protected override System.Drawing.Bitmap Icon => Alpaca4d.Gh.Properties.Resources.ASD_ShellQ4__Alpaca4d_;
+
+        public override Guid ComponentGuid => new Guid("{ee45cffd-ccdc-41d4-aa93-551fb576c2fc}");
+    }
+
+}

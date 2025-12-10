@@ -9,6 +9,7 @@ using Alpaca4d;
 
 namespace Alpaca4d.Gh
 {
+    [Obsolete]
     public class ASDShellQ4 : GH_Component
     {
         /// <summary>
@@ -99,7 +100,7 @@ namespace Alpaca4d.Gh
         }
 
 
-        public override GH_Exposure Exposure => GH_Exposure.secondary;
+        public override GH_Exposure Exposure => GH_Exposure.hidden;
 
         protected override System.Drawing.Bitmap Icon => Alpaca4d.Gh.Properties.Resources.ASD_ShellQ4__Alpaca4d_;
 

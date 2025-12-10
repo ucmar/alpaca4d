@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,20 +9,20 @@ using Rhino.Geometry;
 
 namespace Alpaca4d.Element
 {
-    public partial class ASDShellQ4 : EntityBase, ISerialize, IShell, IElement, IStructure
+    public partial class ASDShellT3 : ISerialize, IShell, IElement, IStructure
     {
         public int? Id { get; set; }
         public Mesh Mesh { get; set; }
         public IMultiDimensionSection Section { get; set; }
         public ElementType Type => ElementType.Shell;
+        public ElementClass ElementClass => ElementClass.ShellDKGT;
         public List<int?> IndexNodes { get; set; }
         public int Ndf => 6;
         public Color Color { get; set; }
-        public ElementClass ElementClass => ElementClass.ASDShellQ4;
         public bool IsCorotational { get; set; } = false;
         public Vector3d LocalX { get; set; }
 
-        public ASDShellQ4(Mesh mesh, IMultiDimensionSection section,  Vector3d localX = default, bool isCorotational = false)
+        public ASDShellT3(Mesh mesh, IMultiDimensionSection section,  Vector3d localX = default, bool isCorotational = false)
         {
             this.Mesh = mesh;
             this.Section = section;
@@ -53,20 +53,13 @@ namespace Alpaca4d.Element
 
             this.IndexNodes = closestIndexes.Select(x => x + model.UniquePointsThreeNDF.Count).ToList();
         }
-        public override string WriteTcl()
+        public string WriteTcl()
         {
-            if(this.IndexNodes != null)
-            {
-                string corotationalFlag = this.IsCorotational ? "-corotational" : string.Empty;
-                string localXString = this.LocalX == default ? string.Empty : $"-local {this.LocalX.X} {this.LocalX.Y} {this.LocalX.Z}";
-                string tcl = $"element ASDShellQ4 {this.Id} {this.IndexNodes[0]} {this.IndexNodes[1]} {this.IndexNodes[2]} {this.IndexNodes[3]} {this.Section.Id} {corotationalFlag} {localXString}\n";
-                return tcl;
-            }
-            else
-            {
-                string tcl = $"element ASDShellQ4";
-                return tcl;
-            }
+            string corotationalFlag = this.IsCorotational ? "-corotational" : string.Empty;
+            string localXString = this.LocalX == default ? string.Empty : $"-local {this.LocalX.X} {this.LocalX.Y} {this.LocalX.Z}";
+            string tcl = $"element ASDShellT3 {this.Id} {this.IndexNodes[0]} {this.IndexNodes[1]} {this.IndexNodes[2]} {this.Section.Id} {corotationalFlag} {localXString}\n";
+
+            return tcl;
         }
     }
 }
