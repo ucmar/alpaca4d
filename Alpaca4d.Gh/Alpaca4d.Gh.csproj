@@ -444,9 +444,6 @@
     <None Update="OpenSees-Solvers\LICENSE.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="UserObject\Shell Forces View %28Alpaca4d%29.ghuser">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="UserObject\" />
