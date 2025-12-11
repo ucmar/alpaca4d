@@ -82,12 +82,13 @@ namespace Alpaca4d.Gh
                 new GH_Number(0.5));
             unit.Inputs[unit.Inputs.Count - 1].Parameter.Optional = true;
 
+            // Replace Max. Error input with a Single Line toggle in slot 4
             unit.RegisterInputParam(
-                new Param_Number(),
-                "Max. Error", "Err",
-                "Adaptive step error tolerance (0 disables adaptation)",
+                new Param_Boolean(),
+                "Single Line", "SL",
+                "If true, generate only one stress line through the seed (GH_StressLine-like). If false, generate a field of lines (GH_StressLines-like).",
                 GH_ParamAccess.item,
-                new GH_Number(0.0));
+                new GH_Boolean(false));
             unit.Inputs[unit.Inputs.Count - 1].Parameter.Optional = true;
 
             // Advanced inputs (will be moved into the Advanced menu)
@@ -110,7 +111,7 @@ namespace Alpaca4d.Gh
             unit.RegisterInputParam(
                 new Param_Number(),
                 "Separation", "dSep",
-                "Separation distance for neighbouring stress lines",
+                "Separation distance for neighbouring stress lines (multi-line mode)",
                 GH_ParamAccess.item,
                 new GH_Number(1.0));
             unit.Inputs[unit.Inputs.Count - 1].Parameter.Optional = true;
@@ -155,8 +156,11 @@ namespace Alpaca4d.Gh
             double stepTolerance = 0.5;
             DA.GetData(3, ref stepTolerance);
 
+            // Max. Error is now fixed at 0 (no adaptive step), mirroring original LilyPad defaults.
             double maxError = 0.0;
-            DA.GetData(4, ref maxError);
+
+            bool singleLine = false;
+            DA.GetData(4, ref singleLine);
 
             double poisson = 0.0;
             DA.GetData(5, ref poisson);
@@ -336,13 +340,33 @@ namespace Alpaca4d.Gh
             var streamlines1 = new Streamlines(principal1, stepTolerance, rk4Method, maxError, dTest);
             var streamlines2 = new Streamlines(principal2, stepTolerance, rk4Method, maxError, dTest);
 
+            // Single-line vs multi-line behaviour:
+            // - singleLine == true  => one streamline through the seed (GH_StressLine-like)
+            // - singleLine == false => neighbour-seeding multi-line field (GH_StressLines-like, uses dSep)
             List<Polyline> lines1;
             List<Polyline> lines2;
 
             try
             {
-                lines1 = streamlines1.CreateStreamlines(seed, 1, dSep);
-                lines2 = streamlines2.CreateStreamlines(seed, 1, dSep);
+                if (singleLine)
+                {
+                    var line1 = streamlines1.CreateStreamline(seed);
+                    var line2 = streamlines2.CreateStreamline(seed);
+                    lines1 = new List<Polyline> { line1 };
+                    lines2 = new List<Polyline> { line2 };
+                }
+                else
+                {
+                    if (dSep <= 0.0)
+                    {
+                        AddRuntimeMessage(GH_RuntimeMessageLevel.Error,
+                            "Separation distance (dSep) must be greater than 0 in multi-line mode.");
+                        return;
+                    }
+
+                    lines1 = streamlines1.CreateStreamlines(seed, 1, dSep);
+                    lines2 = streamlines2.CreateStreamlines(seed, 1, dSep);
+                }
             }
             catch (Exception ex)
             {
