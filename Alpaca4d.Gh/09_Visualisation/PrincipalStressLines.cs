@@ -70,8 +70,8 @@ namespace Alpaca4d.Gh
             unit.RegisterInputParam(
                 new Param_Point(),
                 "Seed", "S",
-                "Seed point for stress lines",
-                GH_ParamAccess.item);
+                "Seed point(s) for stress lines",
+                GH_ParamAccess.list);
             unit.Inputs[unit.Inputs.Count - 1].Parameter.Optional = false;
 
             unit.RegisterInputParam(
@@ -79,7 +79,7 @@ namespace Alpaca4d.Gh
                 "Step Tolerance", "T",
                 "Integration step size along stress lines",
                 GH_ParamAccess.item,
-                new GH_Number(0.5));
+                new GH_Number(0.3));
             unit.Inputs[unit.Inputs.Count - 1].Parameter.Optional = true;
 
             // Replace Max. Error input with a Single Line toggle in slot 4
@@ -113,7 +113,7 @@ namespace Alpaca4d.Gh
                 "Separation", "dSep",
                 "Separation distance for neighbouring stress lines (multi-line mode)",
                 GH_ParamAccess.item,
-                new GH_Number(1.0));
+                new GH_Number(0.5));
             unit.Inputs[unit.Inputs.Count - 1].Parameter.Optional = true;
 
             unit.RegisterInputParam(
@@ -150,10 +150,14 @@ namespace Alpaca4d.Gh
             int step = 0;
             DA.GetData(1, ref step);
 
-            Point3d seed = new Point3d();
-            DA.GetData(2, ref seed);
+            var seeds = new List<Point3d>();
+            if (!DA.GetDataList(2, seeds) || seeds.Count == 0)
+            {
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Warning, "No seed points supplied for stress line generation.");
+                return;
+            }
 
-            double stepTolerance = 0.5;
+            double stepTolerance = 0.3;
             DA.GetData(3, ref stepTolerance);
 
             // Max. Error is now fixed at 0 (no adaptive step), mirroring original LilyPad defaults.
@@ -168,7 +172,7 @@ namespace Alpaca4d.Gh
             bool bending = false;
             DA.GetData(6, ref bending);
 
-            double dSep = 1.0;
+            double dSep = 0.5;
             DA.GetData(7, ref dSep);
 
             double dTest = 0.0;
@@ -340,32 +344,37 @@ namespace Alpaca4d.Gh
             var streamlines1 = new Streamlines(principal1, stepTolerance, rk4Method, maxError, dTest);
             var streamlines2 = new Streamlines(principal2, stepTolerance, rk4Method, maxError, dTest);
 
-            // Single-line vs multi-line behaviour:
-            // - singleLine == true  => one streamline through the seed (GH_StressLine-like)
-            // - singleLine == false => neighbour-seeding multi-line field (GH_StressLines-like, uses dSep)
-            List<Polyline> lines1;
-            List<Polyline> lines2;
+            // Single-line vs multi-line behaviour over multiple seeds:
+            // - singleLine == true  => one streamline per seed (GH_StressLine-like)
+            // - singleLine == false => a field per seed (GH_StressLines-like, uses dSep)
+            var lines1 = new List<Polyline>();
+            var lines2 = new List<Polyline>();
 
             try
             {
-                if (singleLine)
+                foreach (var seed in seeds)
                 {
-                    var line1 = streamlines1.CreateStreamline(seed);
-                    var line2 = streamlines2.CreateStreamline(seed);
-                    lines1 = new List<Polyline> { line1 };
-                    lines2 = new List<Polyline> { line2 };
-                }
-                else
-                {
-                    if (dSep <= 0.0)
+                    if (singleLine)
                     {
-                        AddRuntimeMessage(GH_RuntimeMessageLevel.Error,
-                            "Separation distance (dSep) must be greater than 0 in multi-line mode.");
-                        return;
+                        var line1 = streamlines1.CreateStreamline(seed);
+                        var line2 = streamlines2.CreateStreamline(seed);
+                        lines1.Add(line1);
+                        lines2.Add(line2);
                     }
+                    else
+                    {
+                        if (dSep <= 0.0)
+                        {
+                            AddRuntimeMessage(GH_RuntimeMessageLevel.Error,
+                                "Separation distance (dSep) must be greater than 0 in multi-line mode.");
+                            return;
+                        }
 
-                    lines1 = streamlines1.CreateStreamlines(seed, 1, dSep);
-                    lines2 = streamlines2.CreateStreamlines(seed, 1, dSep);
+                        var seedLines1 = streamlines1.CreateStreamlines(seed, 1, dSep);
+                        var seedLines2 = streamlines2.CreateStreamlines(seed, 1, dSep);
+                        lines1.AddRange(seedLines1);
+                        lines2.AddRange(seedLines2);
+                    }
                 }
             }
             catch (Exception ex)
