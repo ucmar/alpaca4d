@@ -15,7 +15,7 @@ namespace Alpaca4d.Gh
         public Gradients()
           : base("Colors (Alpaca4d)", "Colors",
             "Preset of gradient colors perfect for Data Visualisation",
-            "Alpaca4d", "10_Utility")
+            "Alpaca4d", "09_Visualisation")
         {
             // Draw a Description Underneath the component
             this.Message = Alpaca4d.Gh.ComponentMessage.MyMessage(this);
@@ -62,7 +62,7 @@ namespace Alpaca4d.Gh
         /// each of which can be combined with the GH_Exposure.obscure flag, which 
         /// ensures the component will only be visible on panel dropdowns.
         /// </summary>
-        public override GH_Exposure Exposure => GH_Exposure.secondary;
+        public override GH_Exposure Exposure => GH_Exposure.quarternary;
 
         /// <summary>
         /// Provides an Icon for every component that will be visible in the User Interface.

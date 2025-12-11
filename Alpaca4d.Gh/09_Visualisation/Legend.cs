@@ -138,7 +138,7 @@ namespace Alpaca4d.Gh
             ValueListUtils.UpdateValueLists(this, 3, resultTypes, values);
         }
 
-        public override GH_Exposure Exposure => GH_Exposure.tertiary;
+        public override GH_Exposure Exposure => GH_Exposure.quarternary;
         public override bool IsPreviewCapable => true;
         protected override Bitmap Icon => Alpaca4d.Gh.Properties.Resources.Legend__Alpaca4d_;
         public override Guid ComponentGuid => new Guid("{A6B3B5C9-DB8D-4B6A-9E7E-63C6D2E2F9F5}");
