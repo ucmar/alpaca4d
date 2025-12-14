@@ -172,7 +172,7 @@ namespace Alpaca4d
                 bool hasTriShell = false;
                 foreach (var shell in this.Shells)
                 {
-                    if (shell.ElementClass == ElementClass.ShellDKGT || shell.ElementClass == ElementClass.ShellNLDKGT)
+                    if (shell.ElementClass == ElementClass.ShellDKGT || shell.ElementClass == ElementClass.ShellNLDKGT || shell.ElementClass == ElementClass.ASDShellT3)
                     {
                         hasTriShell = true;
                         break;

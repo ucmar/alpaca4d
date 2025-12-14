@@ -19,11 +19,15 @@ namespace Alpaca4d.Element
         public int Ndf => 6;
         public Color Color { get; set; }
         public ElementClass ElementClass => ElementClass.ASDShellQ4;
+        public bool IsCorotational { get; set; } = false;
+        public Vector3d LocalX { get; set; }
 
-        public ASDShellQ4(Mesh mesh, IMultiDimensionSection section)
+        public ASDShellQ4(Mesh mesh, IMultiDimensionSection section,  Vector3d localX = default, bool isCorotational = false)
         {
             this.Mesh = mesh;
             this.Section = section;
+            this.LocalX = localX;
+            this.IsCorotational = isCorotational;
         }
 
         public void SetTags()
@@ -53,7 +57,9 @@ namespace Alpaca4d.Element
         {
             if(this.IndexNodes != null)
             {
-                string tcl = $"element ASDShellQ4 {this.Id} {this.IndexNodes[0]} {this.IndexNodes[1]} {this.IndexNodes[2]} {this.IndexNodes[3]} {this.Section.Id}\n";
+                string corotationalFlag = this.IsCorotational ? "-corotational" : string.Empty;
+                string localXString = this.LocalX == default ? string.Empty : $"-local {this.LocalX.X} {this.LocalX.Y} {this.LocalX.Z}";
+                string tcl = $"element ASDShellQ4 {this.Id} {this.IndexNodes[0]} {this.IndexNodes[1]} {this.IndexNodes[2]} {this.IndexNodes[3]} {this.Section.Id} {corotationalFlag} {localXString}\n";
                 return tcl;
             }
             else

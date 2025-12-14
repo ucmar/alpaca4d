@@ -296,105 +296,6 @@ namespace Alpaca4d.Result
             return (fxxNested, fyyNested, fxyNested, mxxNested, myyNested, mxyNested, vxzNested, vyzNested);
         }
 
-        public static (List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>) ASDQ4Stresses(Model alpacaModel, int step, string resultType = null)
-        {
-            resultType = "203-ASDShellQ4[201:0:0]";
-            var pxxNested = new List<List<double>>();
-            var pyyNested = new List<List<double>>();
-            var pxyNested = new List<List<double>>();
-            var mxxNested = new List<List<double>>();
-            var myyNested = new List<List<double>>();
-            var mxyNested = new List<List<double>>();
-            var vxzNested = new List<List<double>>();
-            var vyzNested = new List<List<double>>();
-
-            string recorderPath = System.IO.Path.GetFullPath(alpacaModel.Recorders.First().FileName);
-
-            using var h5File = PureHDF.H5File.OpenRead(recorderPath);
-            double[,] values;
-
-            var dataset = h5File.Dataset($"/MODEL_STAGE[1]/RESULTS/ON_ELEMENTS/stresses/{resultType}/DATA/STEP_{step}");
-            var dimX = (long)dataset.Space.Dimensions[0];
-            var dimY = (long)dataset.Space.Dimensions[1];
-
-            values = dataset.Read<double>().ToArray2D(dimX, dimY);
-
-            var asdq4ShellNumber = alpacaModel.Shells.Where(x => x.ElementClass == Element.ElementClass.ASDShellQ4).Count();
-
-            try
-            {
-                for (int i = 0; i < asdq4ShellNumber; i++)
-                {
-                    var pxx = new List<double>();
-                    var pyy = new List<double>();
-                    var pxy = new List<double>();
-                    var mxx = new List<double>();
-                    var myy = new List<double>();
-                    var mxy = new List<double>();
-                    var vxz = new List<double>();
-                    var vyz = new List<double>();
-
-                    int NUMBER_COMPONENTS = 8;
-                    int NUMBER_NODES = 4;
-                    for (int j = 0; j < NUMBER_COMPONENTS * NUMBER_NODES; j += NUMBER_COMPONENTS)
-                    {
-                        pxx.Add((double)values.GetValue(i, j));
-                    }
-
-                    for (int j = 1; j < NUMBER_COMPONENTS * NUMBER_NODES; j += NUMBER_COMPONENTS)
-                    {
-                        pyy.Add((double)values.GetValue(i, j));
-                    }
-
-                    for (int j = 2; j < NUMBER_COMPONENTS * NUMBER_NODES; j += NUMBER_COMPONENTS)
-                    {
-                        pxy.Add((double)values.GetValue(i, j));
-                    }
-
-                    for (int j = 3; j < NUMBER_COMPONENTS * NUMBER_NODES; j += NUMBER_COMPONENTS)
-                    {
-                        mxx.Add((double)values.GetValue(i, j));
-                    }
-
-                    for (int j = 4; j < NUMBER_COMPONENTS * NUMBER_NODES; j += NUMBER_COMPONENTS)
-                    {
-                        myy.Add((double)values.GetValue(i, j));
-                    }
-                    for (int j = 5; j < NUMBER_COMPONENTS * NUMBER_NODES; j += NUMBER_COMPONENTS)
-                    {
-                        mxy.Add((double)values.GetValue(i, j));
-                    }
-                    for (int j = 6; j < NUMBER_COMPONENTS * NUMBER_NODES; j += NUMBER_COMPONENTS)
-                    {
-                        vxz.Add((double)values.GetValue(i, j));
-                    }
-                    for (int j = 7; j < NUMBER_COMPONENTS * NUMBER_NODES; j += NUMBER_COMPONENTS)
-                    {
-                        vyz.Add((double)values.GetValue(i, j));
-                    }
-
-                    pxxNested.Add(pxx);
-                    pyyNested.Add(pyy);
-                    pxyNested.Add(pxy);
-                    mxxNested.Add(mxx);
-                    myyNested.Add(myy);
-                    mxyNested.Add(mxy);
-                    vxzNested.Add(vxz);
-                    vyzNested.Add(vyz);
-                }
-
-                h5File.Dispose();
-
-            }
-            catch
-            {
-                h5File.Dispose();
-                throw new Exception($"STEP_{step} not defined!");
-            }
-
-            return (pxxNested, pyyNested, pxyNested, mxxNested, myyNested, mxyNested, vxzNested, vyzNested);
-        }
-
         public static (List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>) DKGTForces(Model alpacaModel, int step, string resultType = null)
         {
             resultType = "167-ShellDKGT[103:0:0]"; // DKGT
@@ -435,7 +336,7 @@ namespace Alpaca4d.Result
                     var vyz = new List<double>();
 
                     int NUMBER_COMPONENTS = 8;
-                    int NUMBER_NODES = 4;
+                    int NUMBER_NODES = 3;
                     for (int j = 0; j < NUMBER_COMPONENTS * NUMBER_NODES; j += NUMBER_COMPONENTS)
                     {
                         fxx.Add((double)values.GetValue(i, j));
@@ -473,15 +374,6 @@ namespace Alpaca4d.Result
                         vyz.Add((double)values.GetValue(i, j));
                     }
 
-                    fxx.RemoveAt(0);
-                    fyy.RemoveAt(0);
-                    fxy.RemoveAt(0);
-                    mxx.RemoveAt(0);
-                    myy.RemoveAt(0);
-                    mxy.RemoveAt(0);
-                    vxz.RemoveAt(0);
-                    vyz.RemoveAt(0);
-
                     fxxNested.Add(fxx);
                     fyyNested.Add(fyy);
                     fxyNested.Add(fxy);
@@ -503,10 +395,9 @@ namespace Alpaca4d.Result
             return (fxxNested, fyyNested, fxyNested, mxxNested, myyNested, mxyNested, vxzNested, vyzNested);
         }
 
-        public static (List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>) DKGTStresses(Model alpacaModel, int step, string resultType = null)
+        public static (List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>, List<List<double>>) ASDT3Forces(Model alpacaModel, int step, string resultType = null)
         {
-            resultType = "167-ShellDKGT[103:0:0]"; // DKGT
-            //resultType = "168-ShellNLDKGT[103:0:0]" // NLDKGT
+            resultType = "204-ASDShellT3[102:0:0]"; // ASDShellT3
             var fxxNested = new List<List<double>>();
             var fyyNested = new List<List<double>>();
             var fxyNested = new List<List<double>>();
@@ -521,17 +412,17 @@ namespace Alpaca4d.Result
             using var h5File = PureHDF.H5File.OpenRead(recorderPath);
             double[,] values;
 
-            var dataset = h5File.Dataset($"/MODEL_STAGE[1]/RESULTS/ON_ELEMENTS/stresses/{resultType}/DATA/STEP_{step}");
+            var dataset = h5File.Dataset($"/MODEL_STAGE[1]/RESULTS/ON_ELEMENTS/section.force/{resultType}/DATA/STEP_{step}");
             var dimX = (long)dataset.Space.Dimensions[0];
             var dimY = (long)dataset.Space.Dimensions[1];
 
             values = dataset.Read<double>().ToArray2D(dimX, dimY);
 
-            var dkgtShellNumber = alpacaModel.Shells.Where(x => x.ElementClass == Element.ElementClass.ShellDKGT).Count();
+            var asdt3ShellNumber = alpacaModel.Shells.Where(x => x.ElementClass == Element.ElementClass.ASDShellT3).Count();
 
             try
             {
-                for (int i = 0; i < dkgtShellNumber; i++)
+                for (int i = 0; i < asdt3ShellNumber; i++)
                 {
                     var fxx = new List<double>();
                     var fyy = new List<double>();
@@ -543,7 +434,7 @@ namespace Alpaca4d.Result
                     var vyz = new List<double>();
 
                     int NUMBER_COMPONENTS = 8;
-                    int NUMBER_NODES = 4;
+                    int NUMBER_NODES = 3;
                     for (int j = 0; j < NUMBER_COMPONENTS * NUMBER_NODES; j += NUMBER_COMPONENTS)
                     {
                         fxx.Add((double)values.GetValue(i, j));
@@ -581,17 +472,6 @@ namespace Alpaca4d.Result
                         vyz.Add((double)values.GetValue(i, j));
                     }
 
-                    // remove first item as it is the force/stress in the center of the shell
-
-                    fxx.RemoveAt(0);
-                    fyy.RemoveAt(0);
-                    fxy.RemoveAt(0);
-                    mxx.RemoveAt(0);
-                    myy.RemoveAt(0);
-                    mxy.RemoveAt(0);
-                    vxz.RemoveAt(0);
-                    vyz.RemoveAt(0);
-
                     fxxNested.Add(fxx);
                     fyyNested.Add(fyy);
                     fxyNested.Add(fxy);
@@ -612,7 +492,6 @@ namespace Alpaca4d.Result
 
             return (fxxNested, fyyNested, fxyNested, mxxNested, myyNested, mxyNested, vxzNested, vyzNested);
         }
-
 
 
         /// <summary>

@@ -125,7 +125,7 @@ namespace Alpaca4d.Gh
             if (_model.HasQuadShell)
                 (fxQuad, fyQuad, fxyQuad, mxQuad, myQuad, mxyQuad, vxzQuad, vyzQuad) = Alpaca4d.Result.Read.ASDQ4Forces(_model, _step);
             if (_model.HasTriShell)
-                (fxTri, fyTri, fxyTri, mxTri, myTri, mxyTri, vxzTri, vyzTri) = Alpaca4d.Result.Read.DKGTForces(_model, _step);
+                (fxTri, fyTri, fxyTri, mxTri, myTri, mxyTri, vxzTri, vyzTri) = Alpaca4d.Result.Read.ASDT3Forces(_model, _step);
 
             // Merge quad and tri data
             var allForces = new List<List<double>>();
@@ -147,7 +147,7 @@ namespace Alpaca4d.Gh
                         quadIndex++;
                     }
                 }
-                else if (shell.ElementClass == Element.ElementClass.ShellDKGT)
+                else if (shell.ElementClass == Element.ElementClass.ASDShellT3)
                 {
                     if (triIndex < triForces.Count)
                     {

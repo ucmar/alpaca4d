@@ -19,6 +19,7 @@ namespace Alpaca4d.Element
         ZeroLength,
         ForceBeamColumn,
         ASDShellQ4,
+        ASDShellT3,
         ShellNLDKGT,
         ShellDKGT,
         FourNodeTetrahedron,
