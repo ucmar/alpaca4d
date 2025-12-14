@@ -15,7 +15,7 @@ namespace Alpaca4d.Element
         public Mesh Mesh { get; set; }
         public IMultiDimensionSection Section { get; set; }
         public ElementType Type => ElementType.Shell;
-        public ElementClass ElementClass => ElementClass.ShellDKGT;
+        public ElementClass ElementClass => ElementClass.ASDShellT3;
         public List<int?> IndexNodes { get; set; }
         public int Ndf => 6;
         public Color Color { get; set; }

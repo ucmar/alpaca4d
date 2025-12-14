@@ -86,7 +86,7 @@ namespace Alpaca4d.Gh
             if (alpacaModel.HasQuadShell)
                 (fxQuad, fyQuad, fxyQuad, mxQuad, myQuad, mxyQuad, vxzQuad, vyzQuad) = Alpaca4d.Result.Read.ASDQ4Forces(alpacaModel, step);
             if(alpacaModel.HasTriShell)
-                (fxTri, fyTri, fxyTri, mxTri, myTri, mxyTri, vxzTri, vyzTri) = Alpaca4d.Result.Read.DKGTForces(alpacaModel, step);
+                (fxTri, fyTri, fxyTri, mxTri, myTri, mxyTri, vxzTri, vyzTri) = Alpaca4d.Result.Read.ASDT3Forces(alpacaModel, step);
 
             var ids = alpacaModel.Shells.Select(d => d.Id).ToList();
 
@@ -103,7 +103,7 @@ namespace Alpaca4d.Gh
             var vyzQuadTree =  Utils.DataTreeFromNestedList(vyzQuad, quadShellId);
 
             // Convert Nested List to DataTree
-            var triShellId = alpacaModel.Shells.Where(x => x.ElementClass == Element.ElementClass.ShellDKGT).Select(x => x.Id-1).ToList();
+            var triShellId = alpacaModel.Shells.Where(x => x.ElementClass == Element.ElementClass.ASDShellT3).Select(x => x.Id-1).ToList();
 
             var fxTriTree = Utils.DataTreeFromNestedList(fxTri, triShellId);
             var fyTriTree = Utils.DataTreeFromNestedList(fyTri, triShellId);
