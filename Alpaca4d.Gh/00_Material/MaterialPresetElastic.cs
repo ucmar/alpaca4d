@@ -34,7 +34,7 @@ namespace Alpaca4d.Gh
 		// Persisted selection state (for GH file save/load)
 		private string storedType = "Steel";
 		private string storedGrade = "S235";
-		private string storedModel = "nD";
+		private string storedModel = "Uniaxial";
 
 		private bool TryLoadCustomDb(string path)
 		{
