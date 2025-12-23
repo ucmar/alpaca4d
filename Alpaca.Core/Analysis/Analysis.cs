@@ -104,8 +104,10 @@ namespace Alpaca4d
             ProfileSPD,
             SuperLU,
             UmfPack,
+            SparseSYM,
+            SparseSPD,
+            SparseGeneral,
             FullGeneral,
-            SparseSYM
         }
 
         public SystemEquation(string type)

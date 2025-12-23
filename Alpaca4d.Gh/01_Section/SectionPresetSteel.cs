@@ -31,11 +31,11 @@ namespace Alpaca4d.Gh
 
         public override Guid ComponentGuid => new Guid("{0F82C248-4B58-4C25-9F85-6B7F7C4696C0}");
         public override GH_Exposure Exposure => GH_Exposure.secondary;
-        protected override Bitmap Icon => Alpaca4d.Gh.Properties.Resources.I_Section__Alpaca4d_;
+        protected override Bitmap Icon => Alpaca4d.Gh.Properties.Resources.Section_Library__Alpaca4d_;
 
         public SectionPresetSteel()
             : base("Steel Section Library (Alpaca4d)", "Section Library",
-                  "Select a steel section family and section from the embedded database",
+                  "Select a steel section family (I, O, [], 2L) and section from the embedded database",
                   "Alpaca4d", "01_Section")
         {
             // Draw a Description underneath the component
@@ -47,11 +47,14 @@ namespace Alpaca4d.Gh
             // Material is optional, defaulting to elastic steel if not supplied
             pManager.AddGenericParameter("Material", "Material", "Section material (defaults to Elastic Steel)", GH_ParamAccess.item);
             pManager[pManager.ParamCount - 1].Optional = true;
+            
+            // Gap parameter for double L-sections (2L) will be added dynamically
+            // when the 2L family is selected
         }
 
         protected override void RegisterOutputParams(GH_OutputParamManager pManager)
         {
-            pManager.Register_GenericParam("Section", "Section", "Steel I section from the library");
+            pManager.Register_GenericParam("Section", "Section", "Steel section from the library (I, O, [], or 2L)");
         }
 
         #region UI setup
@@ -86,6 +89,9 @@ namespace Alpaca4d.Gh
             // Apply any stored selections (for loaded components) and
             // also build the section list for the selected family.
             RestoreSelectionsFromStoredValues();
+            
+            // Update Gap parameter visibility based on selected family
+            UpdateGapParameterVisibility();
         }
 
         protected override void OnComponentLoaded()
@@ -95,17 +101,61 @@ namespace Alpaca4d.Gh
             // Rebuild dropdown contents and then reapply the stored selection
             InitializeFamilyOptions();
             RestoreSelectionsFromStoredValues();
+            
+            // Update Gap parameter visibility based on selected family
+            UpdateGapParameterVisibility();
         }
 
         private void OnFamilyChanged(object sender, EventArgs e)
         {
             InitializeSectionOptions();
+            UpdateGapParameterVisibility();
             this.ExpireSolution(true);
         }
 
         private void OnSectionChanged(object sender, EventArgs e)
         {
             this.ExpireSolution(true);
+        }
+
+        /// <summary>
+        /// Dynamically add or remove the Gap parameter based on the selected family.
+        /// The Gap parameter is only shown when the 2L family is selected.
+        /// </summary>
+        private void UpdateGapParameterVisibility()
+        {
+            string selFamily = familyDrop != null
+                ? GetSelected(familyDrop, "I")  // Default to "I" family
+                : "I";
+
+            bool is2LFamily = selFamily.Equals("2L", StringComparison.OrdinalIgnoreCase);
+            
+            // Check if Gap parameter exists by looking for it by name
+            IGH_Param gapParam = Params.Input.FirstOrDefault(p => p.Name == "Gap");
+            bool hasGapParameter = gapParam != null;
+
+            if (is2LFamily && !hasGapParameter)
+            {
+                // Add Gap parameter after Material (at index 1)
+                var newGapParam = new Grasshopper.Kernel.Parameters.Param_Number();
+                newGapParam.Name = "Gap";
+                newGapParam.NickName = "Gap";
+                newGapParam.Description = "Gap between two L-sections (in meters)";
+                newGapParam.Access = GH_ParamAccess.item;
+                newGapParam.Optional = true;
+                newGapParam.SetPersistentData(0.01); // Default value 10mm
+                
+                Params.RegisterInputParam(newGapParam, 1);
+                Params.OnParametersChanged();
+                OnDisplayExpired(true);
+            }
+            else if (!is2LFamily && hasGapParameter)
+            {
+                // Remove Gap parameter
+                Params.UnregisterInputParameter(gapParam, true);
+                Params.OnParametersChanged();
+                OnDisplayExpired(true);
+            }
         }
 
         #endregion
@@ -151,18 +201,25 @@ namespace Alpaca4d.Gh
             if (familyDrop == null) return;
             familyDrop.Clear();
 
-            var families = familyToSections.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
+            // Sort families with "I" first, then alphabetically for the rest
+            var families = familyToSections.Keys.OrderBy(k => k == "I" ? "0" : k, StringComparer.OrdinalIgnoreCase).ToList();
             for (int i = 0; i < families.Count; i++)
             {
                 var f = families[i];
                 familyDrop.AddItem(f, f);
+            }
+            
+            // Set "I" as the default selection if no stored family exists
+            if (string.IsNullOrEmpty(storedFamily) && familyDrop.Items.Count > 0)
+            {
+                familyDrop.Value = 0; // "I" will be at index 0
             }
         }
 
         private Dictionary<string, List<string>> BuildFamilyToSections()
         {
             var result = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-            var db = LoadJsonResourceOnce(ref steelSectionDb, "Alpaca4d.Resources.Section.steel_section.json");
+            var db = LoadJsonResourceOnce(ref steelSectionDb, "Alpaca4d.Resources.Section.section.json");
             if (db == null) return result;
 
             void AddSection(string familyName, string sectionName)
@@ -291,10 +348,18 @@ namespace Alpaca4d.Gh
                 try { DA.GetData(0, ref material); } catch { }
             }
 
+            // Gap input (optional, for L-sections)
+            double gap = 0.01; // Default 10mm gap
+            var gapParamIndex = Params.Input.FindIndex(p => p.Name == "Gap");
+            if (gapParamIndex >= 0)
+            {
+                try { DA.GetData(gapParamIndex, ref gap); } catch { }
+            }
+
             // Current selections from UI
             string selFamily = familyDrop != null
-                ? GetSelected(familyDrop, familyToSections.Keys.FirstOrDefault() ?? "Unknown")
-                : familyToSections.Keys.FirstOrDefault() ?? "Unknown";
+                ? GetSelected(familyDrop, "I")
+                : "I";
 
             string selSection = sectionDrop != null
                 ? GetSelected(sectionDrop, null)
@@ -310,59 +375,85 @@ namespace Alpaca4d.Gh
             storedFamily = selFamily;
             storedSection = selSection;
 
-            // Read geometric data from the JSON DB and map to ISection parameters.
-            double height, topWidth, topFlangeThickness, bottomWidth, bottomFlangeThickness, web;
-            if (!TryGetSectionGeometry(selFamily, selSection, out height, out topWidth, out topFlangeThickness, out bottomWidth, out bottomFlangeThickness, out web))
+            // Create the appropriate section type based on the family
+            IUniaxialSection section = CreateSection(selFamily, selSection, material, gap);
+            if (section == null)
             {
                 AddRuntimeMessage(GH_RuntimeMessageLevel.Error, $"Section '{selSection}' not found in the steel section database.");
                 return;
             }
 
-            var section = new Alpaca4d.Section.ISection(selSection, height, topWidth, topFlangeThickness, bottomWidth, bottomFlangeThickness, web, material);
             DA.SetData(0, section);
         }
 
         /// <summary>
-        /// Tries to read the section geometry from the steel section database.
-        /// The JSON is assumed to store dimensions in millimetres:
-        ///   h  - overall depth
-        ///   b  - flange width
-        ///   tw - web thickness
-        ///   tf - flange thickness
-        /// These are converted to metres to be consistent with the rest of Alpaca4d.
+        /// Creates the appropriate section type based on the family.
+        /// Returns CircleCS for O family, RectangleHollowCS for [] family, 
+        /// DoubleLAngleCS for 2L family, and ISection for I family.
         /// </summary>
-        private bool TryGetSectionGeometry(string family, string sectionName,
-            out double height, out double topWidth, out double topFlangeThickness,
-            out double bottomWidth, out double bottomFlangeThickness, out double web)
+        private IUniaxialSection CreateSection(string family, string sectionName, IUniaxialMaterial material, double gap)
         {
-            height = topWidth = topFlangeThickness = bottomWidth = bottomFlangeThickness = web = 0.0;
-
-            var db = LoadJsonResourceOnce(ref steelSectionDb, "Alpaca4d.Resources.Section.steel_section.json");
-            if (db == null) return false;
+            var db = LoadJsonResourceOnce(ref steelSectionDb, "Alpaca4d.Resources.Section.section.json");
+            if (db == null) return null;
 
             JObject sectionEntry = FindSectionEntry(db, family, sectionName);
-            if (sectionEntry == null) return false;
-
-            // Dimensions in mm in the database
-            var h = TryGetDouble(sectionEntry, "h");
-            var b = TryGetDouble(sectionEntry, "b");
-            var tw = TryGetDouble(sectionEntry, "tw");
-            var tf = TryGetDouble(sectionEntry, "tf");
-
-            if (double.IsNaN(h) || double.IsNaN(b) || double.IsNaN(tw) || double.IsNaN(tf))
-                return false;
+            if (sectionEntry == null) return null;
 
             const double mmToM = 0.001;
 
-            height = h * mmToM;
-            topWidth = b * mmToM;
-            bottomWidth = b * mmToM;
-            topFlangeThickness = tf * mmToM;
-            bottomFlangeThickness = tf * mmToM;
-            web = tw * mmToM;
+            if (family.Equals("O", StringComparison.OrdinalIgnoreCase))
+            {
+                // Circular hollow section: d (diameter), t (thickness)
+                var d = TryGetDouble(sectionEntry, "d");
+                var t = TryGetDouble(sectionEntry, "t");
 
-            return true;
+                if (double.IsNaN(d) || double.IsNaN(t))
+                    return null;
+
+                return new Alpaca4d.Section.CircleCS(sectionName, d * mmToM, t * mmToM, material);
+            }
+            else if (family.Equals("[]", StringComparison.Ordinal))
+            {
+                // Rectangular hollow section: h, b, t
+                var h = TryGetDouble(sectionEntry, "h");
+                var b = TryGetDouble(sectionEntry, "b");
+                var t = TryGetDouble(sectionEntry, "t");
+
+                if (double.IsNaN(h) || double.IsNaN(b) || double.IsNaN(t))
+                    return null;
+
+                // RectangleHollowCS constructor: (secName, width, height, web, topFlange, bottomFlange, material)
+                // For rectangular hollow sections with uniform thickness, all wall thicknesses are the same
+                return new Alpaca4d.Section.RectangleHollowCS(sectionName, b * mmToM, h * mmToM, t * mmToM, t * mmToM, t * mmToM, material);
+            }
+            else if (family.Equals("2L", StringComparison.OrdinalIgnoreCase))
+            {
+                // Double L-section (angle): h, b, t
+                var h = TryGetDouble(sectionEntry, "h");
+                var b = TryGetDouble(sectionEntry, "b");
+                var t = TryGetDouble(sectionEntry, "t");
+
+                if (double.IsNaN(h) || double.IsNaN(b) || double.IsNaN(t))
+                    return null;
+
+                // DoubleLAngleCS constructor: (secName, height, width, thickness, gap, material)
+                return new Alpaca4d.Section.DoubleLAngleCS(sectionName, h * mmToM, b * mmToM, t * mmToM, gap, material);
+            }
+            else
+            {
+                // I-section or similar: h, b, tw, tf
+                var h = TryGetDouble(sectionEntry, "h");
+                var b = TryGetDouble(sectionEntry, "b");
+                var tw = TryGetDouble(sectionEntry, "tw");
+                var tf = TryGetDouble(sectionEntry, "tf");
+
+                if (double.IsNaN(h) || double.IsNaN(b) || double.IsNaN(tw) || double.IsNaN(tf))
+                    return null;
+
+                return new Alpaca4d.Section.ISection(sectionName, h * mmToM, b * mmToM, tf * mmToM, b * mmToM, tf * mmToM, tw * mmToM, material);
+            }
         }
+
 
         private static JObject FindSectionEntry(JObject db, string family, string sectionName)
         {
