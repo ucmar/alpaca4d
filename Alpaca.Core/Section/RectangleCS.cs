@@ -81,7 +81,12 @@ namespace Alpaca4d.Section
         {
             get
             {
-                return Rhino.Geometry.Brep.CreatePlanarBreps(this.Curves, 0.01)[0];
+                var planarBreps = Rhino.Geometry.Brep.CreatePlanarBreps(this.Curves, 0.001);
+                if (planarBreps != null && planarBreps.Length > 0)
+                {
+                    return planarBreps[0];
+                }
+                return null;
             }
         }
 

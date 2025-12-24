@@ -124,6 +124,68 @@ namespace Alpaca4d.Section
         {
             get
             {
+                double tolerance = 0.001;
+                
+                // Get the two L-section curves
+                var curves = this.Curves.ToList();
+                
+                // Create connecting rectangle between the two L-sections
+                // Dimensions: (Gap + 0.1 * Thickness) width × Thickness * 0.1 (height)
+                // Position: at the middle (y = 0)
+                var plane = Rhino.Geometry.Plane.WorldXY;
+                double rectWidth = this.Gap + (0.1 * this.Thickness);
+                double halfWidth = rectWidth / 2.0;
+                double rectHeight = this.Thickness * 0.1;
+                double yPosition = 0.0;
+                
+                var rectPoints = new List<Point3d>
+                {
+                    plane.PointAt(-this.Gap / 2 - this.Thickness * 0.5, this.Thickness * 0.1),
+                    plane.PointAt(-this.Gap / 2 - this.Thickness * 0.5, -this.Thickness * 0.1),
+                    plane.PointAt(this.Gap / 2 + this.Thickness * 0.5, -this.Thickness * 0.1),
+                    plane.PointAt(this.Gap / 2 + this.Thickness * 0.5, this.Thickness * 0.1),
+                    plane.PointAt(-this.Gap / 2 - this.Thickness * 0.5, this.Thickness * 0.1) // Close the polyline
+                };
+                var connectingRectangle = new Rhino.Geometry.Polyline(rectPoints).ToNurbsCurve();
+                curves.Add(connectingRectangle);
+                
+                // Use RegionUnion to combine all 3 curves into one unified curve
+                var unionCurves = Curve.CreateBooleanUnion(curves, tolerance);
+                
+                if (unionCurves != null && unionCurves.Length > 0)
+                {
+                    // Create planar brep from the unified curve
+                    var planarBreps = Brep.CreatePlanarBreps(unionCurves[0], tolerance);
+                    if (planarBreps != null && planarBreps.Length > 0)
+                    {
+                        return planarBreps[0];
+                    }
+                }
+                
+                // Fallback: if union fails, try creating breps from individual curves and joining
+                var breps = new List<Brep>();
+                foreach (var curve in curves)
+                {
+                    if (curve != null && curve.IsClosed)
+                    {
+                        var planarBreps = Brep.CreatePlanarBreps(curve, tolerance);
+                        if (planarBreps != null && planarBreps.Length > 0)
+                        {
+                            breps.Add(planarBreps[0]);
+                        }
+                    }
+                }
+                
+                if (breps.Count > 0)
+                {
+                    var joinedBreps = Brep.JoinBreps(breps, tolerance);
+                    if (joinedBreps != null && joinedBreps.Length > 0)
+                    {
+                        return joinedBreps[0];
+                    }
+                    return breps[0];
+                }
+                
                 return null;
             }
         }
