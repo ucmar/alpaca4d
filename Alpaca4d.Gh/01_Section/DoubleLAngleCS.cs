@@ -11,7 +11,7 @@ namespace Alpaca4d.Gh
     public class DoubleLAngleCS : GH_Component
     {
         public DoubleLAngleCS()
-          : base("DoubleLAngleCS (Alpaca4d)", "2L",
+          : base("2LAngleCS (Alpaca4d)", "2L",
             "Construct a Double L-Angle Cross Section",
             "Alpaca4d", "01_Section")
         {

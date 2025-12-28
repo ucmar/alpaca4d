@@ -124,7 +124,7 @@ namespace Alpaca4d.Section
         {
             get
             {
-                double tolerance = 0.001;
+                double tolerance = 0.0001;
                 
                 // Get the two L-section curves
                 var curves = this.Curves.ToList();

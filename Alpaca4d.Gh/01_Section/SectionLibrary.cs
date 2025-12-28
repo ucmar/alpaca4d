@@ -15,7 +15,7 @@ namespace Alpaca4d.Gh
     /// Lets the user pick a section family and a specific section
     /// and returns an <see cref="Alpaca4d.Section.ISection"/> object.
     /// </summary>
-    public class SectionPresetSteel : GH_ExtendableComponent
+    public class SectionLibrary : GH_ExtendableComponent
     {
         private MenuDropDown familyDrop;
         private MenuDropDown sectionDrop;
@@ -33,7 +33,7 @@ namespace Alpaca4d.Gh
         public override GH_Exposure Exposure => GH_Exposure.secondary;
         protected override Bitmap Icon => Alpaca4d.Gh.Properties.Resources.Section_Library__Alpaca4d_;
 
-        public SectionPresetSteel()
+        public SectionLibrary()
             : base("Steel Section Library (Alpaca4d)", "Section Library",
                   "Select a steel section family (I, O, [], 2L) and section from the embedded database",
                   "Alpaca4d", "01_Section")
@@ -44,6 +44,10 @@ namespace Alpaca4d.Gh
 
         protected override void RegisterInputParams(GH_InputParamManager pManager)
         {
+            // Section name input (optional) - allows user to type section name directly
+            pManager.AddTextParameter("Section Name", "Name", "Type section name directly (e.g., 'IPE200'). Overrides dropdown selection.", GH_ParamAccess.item);
+            pManager[pManager.ParamCount - 1].Optional = true;
+            
             // Material is optional, defaulting to elastic steel if not supplied
             pManager.AddGenericParameter("Material", "Material", "Section material (defaults to Elastic Steel)", GH_ParamAccess.item);
             pManager[pManager.ParamCount - 1].Optional = true;
@@ -136,7 +140,7 @@ namespace Alpaca4d.Gh
 
             if (is2LFamily && !hasGapParameter)
             {
-                // Add Gap parameter after Material (at index 1)
+                // Add Gap parameter after Section Name (at index 2)
                 var newGapParam = new Grasshopper.Kernel.Parameters.Param_Number();
                 newGapParam.Name = "Gap";
                 newGapParam.NickName = "Gap";
@@ -145,7 +149,7 @@ namespace Alpaca4d.Gh
                 newGapParam.Optional = true;
                 newGapParam.SetPersistentData(0.01); // Default value 10mm
                 
-                Params.RegisterInputParam(newGapParam, 1);
+                Params.RegisterInputParam(newGapParam, 2);
                 Params.OnParametersChanged();
                 OnDisplayExpired(true);
             }
@@ -341,11 +345,15 @@ namespace Alpaca4d.Gh
 
         protected override void SolveInstance(IGH_DataAccess DA)
         {
+            // Section Name input (optional) - typed section name overrides dropdown
+            string typedSectionName = null;
+            try { DA.GetData(0, ref typedSectionName); } catch { }
+
             // Material input (optional)
             IUniaxialMaterial material = Alpaca4d.Material.UniaxialMaterialElastic.Steel;
-            if (Params.Input.Count > 0)
+            if (Params.Input.Count > 1)
             {
-                try { DA.GetData(0, ref material); } catch { }
+                try { DA.GetData(1, ref material); } catch { }
             }
 
             // Gap input (optional, for L-sections)
@@ -365,9 +373,29 @@ namespace Alpaca4d.Gh
                 ? GetSelected(sectionDrop, null)
                 : null;
 
+            // If user provided a typed section name, use that and update the dropdowns
+            if (!string.IsNullOrWhiteSpace(typedSectionName))
+            {
+                var searchResult = FindSectionInDatabase(typedSectionName.Trim());
+                if (searchResult.found)
+                {
+                    selFamily = searchResult.family;
+                    selSection = searchResult.sectionName;
+                    
+                    // Update the UI dropdowns to reflect the typed input
+                    UpdateDropdownsFromTypedInput(selFamily, selSection);
+                }
+                else
+                {
+                    AddRuntimeMessage(GH_RuntimeMessageLevel.Error, 
+                        $"Section '{typedSectionName}' not found in the steel section database. Please check the spelling or use the dropdown menu.");
+                    return;
+                }
+            }
+
             if (string.IsNullOrEmpty(selSection))
             {
-                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "No section is selected. Please choose a section from the library.");
+                AddRuntimeMessage(GH_RuntimeMessageLevel.Error, "No section is selected. Please choose a section from the library or type a section name.");
                 return;
             }
 
@@ -488,6 +516,88 @@ namespace Alpaca4d.Gh
             return null;
         }
 
+        /// <summary>
+        /// Searches for a section by name in the database and returns the family and section name.
+        /// Performs case-insensitive search across all families.
+        /// </summary>
+        private (bool found, string family, string sectionName) FindSectionInDatabase(string searchName)
+        {
+            if (string.IsNullOrWhiteSpace(searchName))
+                return (false, null, null);
+
+            // First, try to find in the cached family-to-sections dictionary
+            foreach (var kvp in familyToSections)
+            {
+                var match = kvp.Value.FirstOrDefault(s => 
+                    s.Equals(searchName, StringComparison.OrdinalIgnoreCase));
+                
+                if (match != null)
+                {
+                    return (true, kvp.Key, match);
+                }
+            }
+
+            // If not found in cache, search directly in the JSON database
+            var db = LoadJsonResourceOnce(ref steelSectionDb, "Alpaca4d.Resources.Section.section.json");
+            if (db == null) return (false, null, null);
+
+            // Search in all top-level properties
+            foreach (var famProp in db.Properties())
+            {
+                if (famProp.Value is JObject familyObj)
+                {
+                    foreach (var secProp in familyObj.Properties())
+                    {
+                        if (secProp.Name.Equals(searchName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            // Determine the family name
+                            string familyName = famProp.Name;
+                            
+                            // If the top level is a single family group (like "I"), 
+                            // extract family from section name
+                            if (db.Properties().Count() == 1)
+                            {
+                                familyName = ExtractFamilyFromSectionName(secProp.Name);
+                            }
+                            
+                            return (true, familyName, secProp.Name);
+                        }
+                    }
+                }
+            }
+
+            return (false, null, null);
+        }
+
+        /// <summary>
+        /// Updates the dropdown menus to reflect a section that was typed by the user.
+        /// This provides visual feedback that the typed input was recognized.
+        /// </summary>
+        private void UpdateDropdownsFromTypedInput(string family, string sectionName)
+        {
+            if (familyDrop == null || sectionDrop == null) return;
+
+            // Update family dropdown
+            int familyIdx = familyDrop.FindIndex(family);
+            if (familyIdx >= 0)
+            {
+                familyDrop.Value = familyIdx;
+            }
+
+            // Rebuild section dropdown for the selected family
+            InitializeSectionOptions();
+
+            // Update section dropdown
+            int sectionIdx = sectionDrop.FindIndex(sectionName);
+            if (sectionIdx >= 0)
+            {
+                sectionDrop.Value = sectionIdx;
+            }
+
+            // Update Gap parameter visibility if family changed
+            UpdateGapParameterVisibility();
+        }
+
         #endregion
 
         #region GH persistence
@@ -495,7 +605,7 @@ namespace Alpaca4d.Gh
         public override bool Write(GH_IO.Serialization.GH_IWriter writer)
         {
             // Persist the last used selections so the UI can restore them.
-            var chunk = writer.CreateChunk("SectionPresetSteel");
+            var chunk = writer.CreateChunk("SectionLibrary");
             if (!string.IsNullOrEmpty(storedFamily))
                 chunk.SetString("Family", storedFamily);
             if (!string.IsNullOrEmpty(storedSection))
@@ -507,9 +617,12 @@ namespace Alpaca4d.Gh
         public override bool Read(GH_IO.Serialization.GH_IReader reader)
         {
             // Load stored selections (if present) before the base logic triggers OnComponentLoaded.
-            if (reader.ChunkExists("SectionPresetSteel"))
+            // Support both old "SectionPreset" and new "SectionLibrary" chunk names for backward compatibility
+            string chunkName = reader.ChunkExists("SectionLibrary") ? "SectionLibrary" : "SectionPreset";
+            
+            if (reader.ChunkExists(chunkName))
             {
-                var chunk = reader.FindChunk("SectionPresetSteel");
+                var chunk = reader.FindChunk(chunkName);
                 try { storedFamily = chunk.GetString("Family"); } catch { storedFamily = null; }
                 try { storedSection = chunk.GetString("Section"); } catch { storedSection = null; }
             }

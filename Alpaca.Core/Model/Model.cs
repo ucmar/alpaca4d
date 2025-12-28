@@ -258,7 +258,9 @@ namespace Alpaca4d
                 var beamDeformed = new Rhino.Geometry.LineCurve(beamCurve.PointAtStart + startVector, beamCurve.PointAtEnd + endvector);
 
                 var curve = beamDeformed;
-                var section = beam.Section.Curves[0];
+                
+                // Handle sections with multiple curves (e.g., double L-sections)
+                var sectionCurves = beam.Section.Curves;
 
                 var localY = beam.GeomTransf.LocalY;
                 var localZ = beam.GeomTransf.LocalZ;
@@ -268,20 +270,23 @@ namespace Alpaca4d
                 var transfStart = Rhino.Geometry.Transform.PlaneToPlane(Plane.WorldXY, planeStart);
                 var transfEnd = Rhino.Geometry.Transform.PlaneToPlane(Plane.WorldXY, planeEnd);
 
-                var sectionStart = section.DuplicateCurve();
-                var sectionEnd = section.DuplicateCurve();
+                // Create a mesh for each curve in the section
+                foreach (var section in sectionCurves)
+                {
+                    var sectionStart = section.DuplicateCurve();
+                    var sectionEnd = section.DuplicateCurve();
 
-                sectionStart.Transform(transfStart);
-                sectionEnd.Transform(transfEnd);
+                    sectionStart.Transform(transfStart);
+                    sectionEnd.Transform(transfEnd);
 
+                    var polyStart = sectionStart.ToPolyline(0, 0, 0, 0).ToPolyline();
+                    var polyEnd = sectionEnd.ToPolyline(0, 0, 0, 0).ToPolyline();
+                    var sections = new List<Rhino.Geometry.Polyline> { polyStart, polyEnd };
 
-                var polyStart = sectionStart.ToPolyline(0, 0, 0, 0).ToPolyline();
-                var polyEnd = sectionEnd.ToPolyline(0, 0, 0, 0).ToPolyline();
-                var sections = new List<Rhino.Geometry.Polyline> { polyStart, polyEnd };
+                    var beamMesh = Alpaca4d.Utils.CreateLoft(sections, new List<double> { startVctr.Length, endVctr.Length }, colors, min, max);
 
-                var beamMesh = Alpaca4d.Utils.CreateLoft(sections, new List<double> { startVctr.Length, endVctr.Length }, colors, min, max);
-
-                beamDefModel.Add(beamMesh);
+                    beamDefModel.Add(beamMesh);
+                }
             }
 
 

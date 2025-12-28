@@ -14,7 +14,7 @@ using GH_IO.Serialization;
 
 namespace Alpaca4d.Gh
 {
-	public class MaterialPresetElastic : GH_ExtendableComponent
+	public class MaterialLibraryElastic : GH_ExtendableComponent
 	{
 		private MenuDropDown modelDrop;
 		private MenuDropDown typeDrop;
@@ -129,8 +129,8 @@ namespace Alpaca4d.Gh
 		public override GH_Exposure Exposure => GH_Exposure.secondary;
 		protected override Bitmap Icon => Alpaca4d.Gh.Properties.Resources.Material_Library__Alpaca4d_;
 
-		public MaterialPresetElastic()
-			: base("Material Library (Elastic)", "Library",
+		public MaterialLibraryElastic()
+			: base("Material Library Elastic (Alpaca4d)", "Material Library Elastic",
 			  "Select a material type and grade to create an Elastic Material",
 			  "Alpaca4d", "00_Material")
         {
@@ -138,11 +138,15 @@ namespace Alpaca4d.Gh
             this.Message = MyMessage(this);
         }
 
-		protected override void RegisterInputParams(GH_InputParamManager pManager)
-		{
-			pManager.AddGenericParameter("DatabasePath", "DBPath", "Optional custom material database JSON (steel_properties schema).", GH_ParamAccess.item);
-			pManager[pManager.ParamCount - 1].Optional = true;
-		}
+	protected override void RegisterInputParams(GH_InputParamManager pManager)
+	{
+		// Grade name input (optional) - allows user to type grade name directly
+		pManager.AddTextParameter("Material Name", "Name", "Type grade name directly (e.g., 'S235', 'C30/37'). Overrides dropdown selection.", GH_ParamAccess.item);
+		pManager[pManager.ParamCount - 1].Optional = true;
+		
+		pManager.AddGenericParameter("DatabasePath", "DBPath", "Optional custom material database JSON (steel_properties schema).", GH_ParamAccess.item);
+		pManager[pManager.ParamCount - 1].Optional = true;
+	}
 
 		protected override void RegisterOutputParams(GH_OutputParamManager pManager)
 		{
@@ -352,49 +356,74 @@ namespace Alpaca4d.Gh
 			if (!double.IsNaN(nuComputed)) nu = nuComputed;
 		}
 
-		protected override void SolveInstance(IGH_DataAccess DA)
+	protected override void SolveInstance(IGH_DataAccess DA)
+	{
+		// Grade Name input (optional) - typed grade name overrides dropdown
+		string typedGradeName = null;
+		try { DA.GetData(0, ref typedGradeName); } catch { }
+
+		// 1) Try to load/refresh custom DB if provided
+		string customPath = null;
+		if (Params.Input.Count > 1)
 		{
-			// 1) Try to load/refresh custom DB if provided
-			string customPath = null;
-			if (Params.Input.Count > 0)
+			try { DA.GetData(1, ref customPath); } catch { customPath = null; }
+		}
+		var dbChanged = TryLoadCustomDb(customPath);
+		if (dbChanged)
+		{
+			// Rebuild types/grades when DB source changes
+			InitializeTypeOptions();
+			InitializeGradeOptions();
+		}
+
+		// Current selections from UI
+		string selType = typeDrop != null ? GetSelected(typeDrop, "Steel") : "Steel";
+		string selGrade = gradeDrop != null ? GetSelected(gradeDrop, "S235") : "S235";
+		string selModel = modelDrop != null ? GetSelected(modelDrop, "nD") : "nD";
+
+		// If user provided a typed grade name, use that and update the dropdowns
+		if (!string.IsNullOrWhiteSpace(typedGradeName))
+		{
+			var searchResult = FindGradeInDatabase(typedGradeName.Trim());
+			if (searchResult.found)
 			{
-				try { DA.GetData(0, ref customPath); } catch { customPath = null; }
-			}
-			var dbChanged = TryLoadCustomDb(customPath);
-			if (dbChanged)
-			{
-				// Rebuild types/grades when DB source changes
-				InitializeTypeOptions();
-				InitializeGradeOptions();
-			}
-
-			string selType = typeDrop != null ? GetSelected(typeDrop, "Steel") : "Steel";
-			string selGrade = gradeDrop != null ? GetSelected(gradeDrop, "S235") : "S235";
-			string selModel = modelDrop != null ? GetSelected(modelDrop, "nD") : "nD";
-
-			// Keep the persisted selection state in sync with the UI
-			storedType = selType;
-			storedGrade = selGrade;
-			storedModel = selModel;
-
-			// Compute properties in kN/m^2, unit system consistent with existing components (Force=kN, Length=m)
-			double E, nu, rho;
-			GetElasticParameters(selType, selGrade, out E, out nu, out rho);
-			double G = E / (2.0 * (1.0 + nu));
-
-			if (string.Equals(selModel, "Uniaxial", StringComparison.OrdinalIgnoreCase))
-			{
-				double eNeg = E;
-				double eta = 0.0;
-				var material = new Alpaca4d.Material.UniaxialMaterialElastic(selGrade, E, eNeg, eta, G, nu, rho);
-				DA.SetData(0, material);
+				selType = searchResult.type;
+				selGrade = searchResult.gradeName;
+				
+				// Update the UI dropdowns to reflect the typed input
+				UpdateDropdownsFromTypedInput(selType, selGrade);
 			}
 			else
 			{
-				var material = new Alpaca4d.Material.ElasticIsotropicMaterial(selGrade, E, G, nu, rho);
-				DA.SetData(0, material);
+				AddRuntimeMessage(GH_RuntimeMessageLevel.Error, 
+					$"Material grade '{typedGradeName}' not found in the material database. Please check the spelling or use the dropdown menu.");
+				return;
 			}
 		}
+
+		// Keep the persisted selection state in sync with the UI
+		storedType = selType;
+		storedGrade = selGrade;
+		storedModel = selModel;
+
+		// Compute properties in kN/m^2, unit system consistent with existing components (Force=kN, Length=m)
+		double E, nu, rho;
+		GetElasticParameters(selType, selGrade, out E, out nu, out rho);
+		double G = E / (2.0 * (1.0 + nu));
+
+		if (string.Equals(selModel, "Uniaxial", StringComparison.OrdinalIgnoreCase))
+		{
+			double eNeg = E;
+			double eta = 0.0;
+			var material = new Alpaca4d.Material.UniaxialMaterialElastic(selGrade, E, eNeg, eta, G, nu, rho);
+			DA.SetData(0, material);
+		}
+		else
+		{
+			var material = new Alpaca4d.Material.ElasticIsotropicMaterial(selGrade, E, G, nu, rho);
+			DA.SetData(0, material);
+		}
+	}
 
 		private void GetElasticParameters(string type, string grade, out double E, out double nu, out double rho)
 		{
@@ -499,27 +528,100 @@ namespace Alpaca4d.Gh
 			nu = !double.IsNaN(nuComputed) ? nuComputed : 0.35;
 		}
 
-		private void GetPlasticParameters(string grade, out double E, out double nu, out double rho)
+	private void GetPlasticParameters(string grade, out double E, out double nu, out double rho)
+	{
+		SetDefaultElastic(out E, out nu, out rho);
+		var db = LoadJsonResourceOnce(ref plasticDb, "Alpaca4d.Resources.Material.plastic_properties.json");
+		var entry = db?[grade] as JObject;
+		if (entry == null)
 		{
-			SetDefaultElastic(out E, out nu, out rho);
-			var db = LoadJsonResourceOnce(ref plasticDb, "Alpaca4d.Resources.Material.plastic_properties.json");
-			var entry = db?[grade] as JObject;
-			if (entry == null)
-			{
-				nu = 0.40;
-				return;
-			}
-
-			var eMpa = TryGetDouble(entry, "E");
-			var gMpa = TryGetDouble(entry, "G");
-			var rhoVal = TryGetDouble(entry, "rho");
-
-			if (!double.IsNaN(eMpa)) E = MPaTokN_m2(eMpa);
-			if (!double.IsNaN(rhoVal)) rho = rhoVal;
-
-			var nuComputed = ComputeNuFromEG(MPaTokN_m2(eMpa), MPaTokN_m2(gMpa));
-			nu = !double.IsNaN(nuComputed) ? nuComputed : 0.40;
+			nu = 0.40;
+			return;
 		}
+
+		var eMpa = TryGetDouble(entry, "E");
+		var gMpa = TryGetDouble(entry, "G");
+		var rhoVal = TryGetDouble(entry, "rho");
+
+		if (!double.IsNaN(eMpa)) E = MPaTokN_m2(eMpa);
+		if (!double.IsNaN(rhoVal)) rho = rhoVal;
+
+		var nuComputed = ComputeNuFromEG(MPaTokN_m2(eMpa), MPaTokN_m2(gMpa));
+		nu = !double.IsNaN(nuComputed) ? nuComputed : 0.40;
+	}
+
+	/// <summary>
+	/// Searches for a material grade by name across all databases (Steel, Concrete, Timber, Plastic, Custom).
+	/// Performs case-insensitive search and returns the material type and grade name if found.
+	/// </summary>
+	private (bool found, string type, string gradeName) FindGradeInDatabase(string searchName)
+	{
+		if (string.IsNullOrWhiteSpace(searchName))
+			return (false, null, null);
+
+		// First, try to find in the cached type-to-grades dictionary
+		foreach (var kvp in typeToGrades)
+		{
+			var match = kvp.Value.FirstOrDefault(g => 
+				g.Equals(searchName, StringComparison.OrdinalIgnoreCase));
+			
+			if (match != null)
+			{
+				return (true, kvp.Key, match);
+			}
+		}
+
+		// If not found in cache, search directly in all JSON databases
+		var databases = new[]
+		{
+			(db: LoadJsonResourceOnce(ref steelDb, "Alpaca4d.Resources.Material.steel_properties.json"), type: "Steel"),
+			(db: LoadJsonResourceOnce(ref concreteDb, "Alpaca4d.Resources.Material.concrete_properties.json"), type: "Concrete"),
+			(db: LoadJsonResourceOnce(ref timberDb, "Alpaca4d.Resources.Material.timber_properties.json"), type: "Timber"),
+			(db: LoadJsonResourceOnce(ref plasticDb, "Alpaca4d.Resources.Material.plastic_properties.json"), type: "Plastic"),
+			(db: customDb, type: GetMaterialTypeFromDb(customDb) ?? "Custom")
+		};
+
+		foreach (var (db, type) in databases)
+		{
+			if (db == null) continue;
+
+			foreach (var prop in db.Properties())
+			{
+				if (prop.Name.Equals(searchName, StringComparison.OrdinalIgnoreCase))
+				{
+					return (true, type, prop.Name);
+				}
+			}
+		}
+
+		return (false, null, null);
+	}
+
+	/// <summary>
+	/// Updates the dropdown menus to reflect a material grade that was typed by the user.
+	/// This provides visual feedback that the typed input was recognized.
+	/// </summary>
+	private void UpdateDropdownsFromTypedInput(string type, string gradeName)
+	{
+		if (typeDrop == null || gradeDrop == null) return;
+
+		// Update type dropdown
+		int typeIdx = typeDrop.FindIndex(type);
+		if (typeIdx >= 0)
+		{
+			typeDrop.Value = typeIdx;
+		}
+
+		// Rebuild grade dropdown for the selected type
+		InitializeGradeOptions();
+
+		// Update grade dropdown
+		int gradeIdx = gradeDrop.FindIndex(gradeName);
+		if (gradeIdx >= 0)
+		{
+			gradeDrop.Value = gradeIdx;
+		}
+	}
 
 		#region GH persistence
 
