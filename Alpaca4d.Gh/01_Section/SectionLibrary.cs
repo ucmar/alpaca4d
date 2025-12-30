@@ -30,7 +30,7 @@ namespace Alpaca4d.Gh
         private string storedSection = null;
 
         public override Guid ComponentGuid => new Guid("{0F82C248-4B58-4C25-9F85-6B7F7C4696C0}");
-        public override GH_Exposure Exposure => GH_Exposure.secondary;
+        public override GH_Exposure Exposure => GH_Exposure.tertiary;
         protected override Bitmap Icon => Alpaca4d.Gh.Properties.Resources.Section_Library__Alpaca4d_;
 
         public SectionLibrary()

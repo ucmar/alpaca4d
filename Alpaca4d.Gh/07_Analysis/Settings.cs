@@ -33,7 +33,7 @@ namespace Alpaca4d.Gh
             pManager[pManager.ParamCount - 1].Optional = true;
             pManager.AddTextParameter("Numberer", "Numberer", "Connect a 'ValueList'\nRCM, AMD, Plain", GH_ParamAccess.item, "RCM");
             pManager[pManager.ParamCount - 1].Optional = true;
-            pManager.AddTextParameter("System", "System", "Connect a 'ValueList'\nBandGen, BandSPD, ProfileSPD, SuperLU, UmfPack, FullGeneral, SparseSYM", GH_ParamAccess.item, "BandGen");
+            pManager.AddTextParameter("System", "System", "Connect a 'ValueList'\nBandGen, BandSPD, ProfileSPD, SuperLU, UmfPack, SparseSYM, SparseSPD, SparseGeneral, FullGeneral", GH_ParamAccess.item, "SparseSPD");
             pManager[pManager.ParamCount - 1].Optional = true;
             pManager.AddGenericParameter("Test", "Test", "", GH_ParamAccess.item);
             pManager[pManager.ParamCount - 1].Optional = true;
@@ -77,7 +77,7 @@ namespace Alpaca4d.Gh
             var numbererObj = new Numberer(numberer);
 
             ///
-            var system = "BandGen";
+            var system = "SparseSPD";
             DA.GetData(3, ref system);
             var systemObj = new Alpaca4d.SystemEquation(system);
 

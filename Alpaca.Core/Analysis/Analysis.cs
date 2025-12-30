@@ -385,9 +385,9 @@ namespace Alpaca4d
             try
             {
                 this.NumIncr = int.Parse(values[0]);
-                this.Dt = int.Parse(values[1]);
-                this.DtMin = int.Parse(values[2]);
-                this.DtMax = int.Parse(values[3]);
+                this.Dt = double.Parse(values[1]);
+                this.DtMin = double.Parse(values[2]);
+                this.DtMax = double.Parse(values[3]);
                 this.Jd = int.Parse(values[4]);
             }
             catch
@@ -419,7 +419,7 @@ namespace Alpaca4d
             this.AlphaM = alphaM;
             this.BetaKCurr = betaKCurr;
             this.BetaKInit = betaKInit;
-            this.BetaKCurr = betaKcomm;
+            this.BetaKComm = betaKcomm;
         }
 
         public string WriteTcl()

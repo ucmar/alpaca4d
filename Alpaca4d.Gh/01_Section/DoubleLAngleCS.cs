@@ -91,7 +91,7 @@ namespace Alpaca4d.Gh
         /// You can add image files to your project resources and access them like this:
         /// return Resources.IconForThisComponent;
         /// </summary>
-        protected override System.Drawing.Bitmap Icon => Alpaca4d.Gh.Properties.Resources.Generic_Section__Alpaca4d_;
+        protected override System.Drawing.Bitmap Icon => Alpaca4d.Gh.Properties.Resources.L_Section__Alpaca4d_;
 
         /// <summary>
         /// Each component must have a unique Guid to identify it. 
