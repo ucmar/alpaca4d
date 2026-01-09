@@ -454,9 +454,6 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="UserObject\" />
-  </ItemGroup>
 
   <!-- ==========================================
        BUILD TARGETS

@@ -36,11 +36,12 @@ namespace Alpaca4d.UI
             Topmost = true;
             Padding = new Padding(20);
             BackgroundColor = Eto.Drawing.Colors.White;
-            Size = new Size(500, 400);
-
-            // Center the form on screen
-            var centerScreen = Screen.DisplayBounds.Center;
-            Location = new Point((int)centerScreen.X - Size.Width / 2, (int)centerScreen.Y - Size.Height / 2);
+            
+            // Let the form auto-size based on content - this handles DPI and platform differences automatically
+            AutoSize = true;
+            
+            // Set minimum size to ensure the form is never too small
+            MinimumSize = new Size(480, 400);
 
             // Set icon if available
             try
@@ -59,6 +60,16 @@ namespace Alpaca4d.UI
 
             // Create main layout
             Content = CreateMainLayout();
+            
+            // Center the form on screen after content is set (so auto-size has calculated dimensions)
+            Shown += (sender, e) =>
+            {
+                var screen = Screen.FromPoint(PointFromScreen(new PointF(0, 0))) ?? Screen.PrimaryScreen;
+                var screenBounds = screen.WorkingArea;
+                Location = new Point(
+                    (int)(screenBounds.Center.X - Width / 2),
+                    (int)(screenBounds.Center.Y - Height / 2));
+            };
         }
 
         private Control CreateMainLayout()
@@ -134,7 +145,7 @@ namespace Alpaca4d.UI
             labelRow.Cells.Add(listLabel);
             listLayout.Rows.Add(labelRow);
 
-            // License list box - make it expandable horizontally only
+            // License list box - fixed size ensures consistent appearance
             var listRow = new TableRow();
             licenseListBox = new ListBox
             {
