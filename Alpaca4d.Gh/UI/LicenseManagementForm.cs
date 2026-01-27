@@ -384,7 +384,7 @@ namespace Alpaca4d.UI
             try
             {
                 // Open the license purchase URL in the default browser
-                string licenseUrl = "https://www.food4rhino.com/en/app/alpaca4d-openseesgh";
+                string licenseUrl = "https://alpaca4d.github.io/buy.html";
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = licenseUrl,
