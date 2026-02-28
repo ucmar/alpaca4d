@@ -123,6 +123,7 @@
     <Compile Include="Element\SSPbrick.cs" />
     <Compile Include="Element\Support.cs" />
     <Compile Include="Constraint\EqualDOF.cs" />
+    <Compile Include="Constraint\RigidLink.cs" />
     <Compile Include="Generic\EntityBase.cs" />
     <Compile Include="Generic\IBrick.cs" />
     <Compile Include="Generic\IIntegration.cs" />

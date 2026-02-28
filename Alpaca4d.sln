@@ -5,6 +5,7 @@ VisualStudioVersion = 17.1.32421.90
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Alpaca4d.Gh", "Alpaca4d.Gh\Alpaca4d.Gh.csproj", "{E75B99EE-819F-4CFC-83C0-BF6551FD16C0}"
 	ProjectSection(ProjectDependencies) = postProject
+		{B5BADCFA-479E-4E9C-8F17-1F4D77B4DEE2} = {B5BADCFA-479E-4E9C-8F17-1F4D77B4DEE2}
 		{2650D2A7-5DBC-432A-B182-223DBCCA3639} = {2650D2A7-5DBC-432A-B182-223DBCCA3639}
 	EndProjectSection
 EndProject

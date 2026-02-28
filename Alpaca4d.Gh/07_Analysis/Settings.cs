@@ -143,7 +143,6 @@ namespace Alpaca4d.Gh
             DA.SetData(0, settings);
         }
 
-
         protected override void BeforeSolveInstance()
         {
             List<string> resultTypes;
@@ -162,7 +161,6 @@ namespace Alpaca4d.Gh
 
             resultTypes = Enum.GetNames(typeof(Alpaca4d.Analysis.AnalysisType)).ToList();
             ValueListUtils.UpdateValueLists(this, 7, resultTypes, null);
-
         }
 
 

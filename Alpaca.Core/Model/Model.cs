@@ -492,6 +492,12 @@ namespace Alpaca4d
                     sixNdfPoints.Add((Point3d)equalDOF.MasterNode);
                     sixNdfPoints.Add(equalDOF.SlaveNode);
                 }
+                else if (constraint.ConstraintType == Constraints.ConstraintType.RigidLink)
+                {
+                    var rigidLink = (Alpaca4d.Constraints.RigidLink)constraint;
+                    sixNdfPoints.Add(rigidLink.RetainedNode);
+                    sixNdfPoints.Add(rigidLink.ConstrainedNode);
+                }
             }
 
             if (threeNdfPoints.Any())

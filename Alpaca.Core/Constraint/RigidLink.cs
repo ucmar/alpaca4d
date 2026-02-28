@@ -1,0 +1,50 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+using Rhino.Geometry;
+using Alpaca4d.Element;
+using Alpaca4d.Generic;
+
+namespace Alpaca4d.Constraints
+{
+    public enum RigidLinkType
+    {
+        bar,
+        beam
+    }
+
+    public partial class RigidLink : EntityBase, IConstraint, IStructure, ISerialize
+    {
+        public Rhino.Geometry.Point3d RetainedNode { get; set; }
+        public Rhino.Geometry.Point3d ConstrainedNode { get; set; }
+        public int RetainedNodeId { get; set; }
+        public int ConstrainedNodeId { get; set; }
+        public RigidLinkType Type { get; set; }
+        public ConstraintType ConstraintType => ConstraintType.RigidLink;
+
+        public void SetTopologyRTree(Model model)
+        {
+            this.RetainedNodeId = Alpaca4d.Utils.RTreeSearch(model.RTreeCloudPointSixNDF, new List<Point3d> { this.RetainedNode }, model.Tollerance)
+                .Select(x => x + model.UniquePointsThreeNDF.Count)
+                .First();
+            this.ConstrainedNodeId = Alpaca4d.Utils.RTreeSearch(model.RTreeCloudPointSixNDF, new List<Point3d> { this.ConstrainedNode }, model.Tollerance)
+                .Select(x => x + model.UniquePointsThreeNDF.Count)
+                .First();
+        }
+
+        public RigidLink(Point3d retainedNode, Point3d constrainedNode, RigidLinkType type = RigidLinkType.beam)
+        {
+            this.RetainedNode = retainedNode;
+            this.ConstrainedNode = constrainedNode;
+            this.Type = type;
+        }
+
+        public override string WriteTcl()
+        {
+            return $"rigidLink {this.Type} {this.RetainedNodeId} {this.ConstrainedNodeId}\n";
+        }
+    }
+}
